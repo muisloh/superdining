@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Manager Clock-In Redirect</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 2rem;
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h2 id="status">🔄 Loading...</h2>
+  <p id="message"></p>
+
+  <script>
+    const query = new URLSearchParams(window.location.search);
+    const manager = query.get("manager");
+    const outlet = query.get("outlet");
+
+    const jotformBase = "https://form.jotform.com/251891698588077";
+
+    const statusEl = document.getElementById("status");
+    const messageEl = document.getElementById("message");
+
+    function storeManager(name) {
+      localStorage.setItem("superdining_manager", name);
+    }
+
+    function getStoredManager() {
+      return localStorage.getItem("superdining_manager");
+    }
+
+    function redirectToForm(name, outlet) {
+      const jotformUrl = `${jotformBase}?name=${encodeURIComponent(name)}&outlet=${encodeURIComponent(outlet)}`;
+      window.location.href = jotformUrl;
+    }
+
+    function showStatus(title, message) {
+      statusEl.textContent = title;
+      messageEl.textContent = message || "";
+    }
+
+    (function init() {
+      if (manager) {
+        // First NFC tap — store manager
+        storeManager(manager);
+        showStatus("✅ Manager Verified", `Hi ${manager}, now tap the outlet NFC tag to proceed.`);
+      } else if (outlet) {
+        // Second NFC tap — retrieve manager and redirect
+        const storedManager = getStoredManager();
+        if (storedManager) {
+          showStatus("✅ Redirecting...", `Manager: ${storedManager}, Outlet: ${outlet}`);
+          redirectToForm(storedManager, outlet);
+        } else {
+          showStatus("❌ Access Denied", "Please tap your manager NFC tag first.");
+        }
+      } else {
+        showStatus("ℹ️ Invalid Access", "Please use the NFC tags to access this form.");
+      }
+    })();
+  </script>
+</body>
+</html>
