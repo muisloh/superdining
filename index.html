@@ -64,7 +64,27 @@
       } else {
         showStatus("ℹ️ Invalid Access", "Please use the NFC tags to access this form.");
       }
+
+      // 🔒 Hide full query string from address bar after storing data
+      window.history.pushState({}, document.title, '/superdining/');
     })();
+
+    // 🔒 Basic copy prevention below
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('selectstart', e => e.preventDefault());
+    document.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'u')) {
+        e.preventDefault();
+      }
+    });
+    let longPressTimer;
+    document.addEventListener('touchstart', () => {
+      longPressTimer = setTimeout(() => {
+        alert("Action blocked.");
+      }, 600);
+    });
+    document.addEventListener('touchend', () => clearTimeout(longPressTimer));
   </script>
 </body>
 </html>
+
