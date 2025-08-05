@@ -47,13 +47,37 @@
       messageEl.textContent = message || "";
     }
 
+    function getBrowserName() {
+      const ua = navigator.userAgent.toLowerCase();
+      if (ua.includes("android")) {
+        if (!ua.includes("chrome")) return "not-chrome";
+      }
+      if (ua.includes("iphone") || ua.includes("ipad")) {
+        if (!ua.includes("safari") || ua.includes("crios") || ua.includes("fxios")) return "not-safari";
+      }
+      return "ok";
+    }
+
+    function ensureCorrectBrowser() {
+      const browserCheck = getBrowserName();
+      if (browserCheck === "not-chrome") {
+        showStatus("🔒 Open in Chrome", "Please open this link using Google Chrome.");
+        return false;
+      }
+      if (browserCheck === "not-safari") {
+        showStatus("🔒 Open in Safari", "Please open this link using Safari browser.");
+        return false;
+      }
+      return true;
+    }
+
     (function init() {
+      if (!ensureCorrectBrowser()) return;
+
       if (manager) {
-        // First NFC tap — store manager
         storeManager(manager);
         showStatus("✅ Manager Verified", `Hi ${manager}, now tap the outlet NFC tag to proceed.`);
       } else if (outlet) {
-        // Second NFC tap — retrieve manager and redirect
         const storedManager = getStoredManager();
         if (storedManager) {
           showStatus("✅ Redirecting...", `Manager: ${storedManager}, Outlet: ${outlet}`);
@@ -65,11 +89,10 @@
         showStatus("ℹ️ Invalid Access", "Please use the NFC tags to access this form.");
       }
 
-      // 🔒 Hide full query string from address bar after storing data
       window.history.pushState({}, document.title, '/superdining/');
     })();
 
-    // 🔒 Basic copy prevention below
+    // 🔒 Basic copy prevention
     document.addEventListener('contextmenu', e => e.preventDefault());
     document.addEventListener('selectstart', e => e.preventDefault());
     document.addEventListener('keydown', e => {
@@ -87,4 +110,5 @@
   </script>
 </body>
 </html>
+
 
