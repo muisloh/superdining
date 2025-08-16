@@ -1,114 +1,42 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Manager Clock-In Redirect</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      text-align: center;
-      padding: 2rem;
-    }
-    .hidden {
-      display: none;
-    }
-  </style>
-</head>
-<body>
-  <h2 id="status">🔄 Loading...</h2>
-  <p id="message"></p>
-
-  <script>
+<script>
+  (function init() {
     const query = new URLSearchParams(window.location.search);
     const manager = query.get("manager");
-    const outlet = query.get("outlet");
 
-    const jotformBase = "https://form.jotform.com/251891698588077";
+    if (manager) {
+      // Save manager to localStorage
+      localStorage.setItem("superdining_manager", manager);
 
-    const statusEl = document.getElementById("status");
-    const messageEl = document.getElementById("message");
+      // Show status text
+      document.getElementById("status").textContent = "✅ Manager Verified";
+      document.getElementById("message").textContent = `Hi ${manager}, redirecting...`;
 
-    function storeManager(name) {
-      localStorage.setItem("superdining_manager", name);
-    }
+      // Build final link (base link you want to open)
+      const finalLink = `https://example.com/clockin?manager=${encodeURIComponent(manager)}`;
 
-    function getStoredManager() {
-      return localStorage.getItem("superdining_manager");
-    }
+      // Use Android intent:// scheme to force "Choose Browser" prompt
+      const intentLink = `intent://${finalLink.replace(/^https?:\/\//, '')}#Intent;scheme=https;end`;
 
-    function redirectToForm(name, outlet) {
-      const jotformUrl = `${jotformBase}?name=${encodeURIComponent(name)}&outlet=${encodeURIComponent(outlet)}`;
-      window.location.href = jotformUrl;
-    }
+      // For iOS fallback (Apple doesn’t allow browser chooser, only Safari will open)
+      const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 
-    function showStatus(title, message) {
-      statusEl.textContent = title;
-      messageEl.textContent = message || "";
-    }
-
-    function getBrowserName() {
-      const ua = navigator.userAgent.toLowerCase();
-      if (ua.includes("android")) {
-        if (!ua.includes("chrome")) return "not-chrome";
-      }
-      if (ua.includes("iphone") || ua.includes("ipad")) {
-        if (!ua.includes("safari") || ua.includes("crios") || ua.includes("fxios")) return "not-safari";
-      }
-      return "ok";
-    }
-
-    function ensureCorrectBrowser() {
-      const browserCheck = getBrowserName();
-      if (browserCheck === "not-chrome") {
-        showStatus("🔒 Open in Chrome", "Please open this link using Google Chrome.");
-        return false;
-      }
-      if (browserCheck === "not-safari") {
-        showStatus("🔒 Open in Safari", "Please open this link using Safari browser.");
-        return false;
-      }
-      return true;
-    }
-
-    (function init() {
-      if (!ensureCorrectBrowser()) return;
-
-      if (manager) {
-        storeManager(manager);
-        showStatus("✅ Manager Verified", `Hi ${manager}, now tap the outlet NFC tag to proceed.`);
-      } else if (outlet) {
-        const storedManager = getStoredManager();
-        if (storedManager) {
-          showStatus("✅ Redirecting...", `Manager: ${storedManager}, Outlet: ${outlet}`);
-          redirectToForm(storedManager, outlet);
+      setTimeout(() => {
+        if (isIOS) {
+          window.location.href = finalLink; // will just open Safari
         } else {
-          showStatus("❌ Access Denied", "Please tap your manager NFC tag first.");
+          window.location.href = intentLink; // Android will show "Open with" dialog
         }
-      } else {
-        showStatus("ℹ️ Invalid Access", "Please use the NFC tags to access this form.");
-      }
+      }, 1500);
 
-      window.history.pushState({}, document.title, '/superdining/');
-    })();
+    } else {
+      document.getElementById("status").textContent = "ℹ️ Invalid Access";
+      document.getElementById("message").textContent = "Please use the NFC tag or JotForm link.";
+    }
 
-    // 🔒 Basic copy prevention
-    document.addEventListener('contextmenu', e => e.preventDefault());
-    document.addEventListener('selectstart', e => e.preventDefault());
-    document.addEventListener('keydown', e => {
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'u')) {
-        e.preventDefault();
-      }
-    });
-    let longPressTimer;
-    document.addEventListener('touchstart', () => {
-      longPressTimer = setTimeout(() => {
-        alert("Action blocked.");
-      }, 600);
-    });
-    document.addEventListener('touchend', () => clearTimeout(longPressTimer));
-  </script>
-</body>
-</html>
+    // Clean URL (hide query string from address bar)
+    window.history.pushState({}, document.title, '/superdining/');
+  })();
+</script>
+
 
 
