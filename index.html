@@ -10,14 +10,23 @@
       text-align: center;
       padding: 2rem;
     }
-    .hidden {
-      display: none;
+    .hidden { display: none; }
+    button {
+      margin-top: 1rem;
+      padding: 0.6rem 1.2rem;
+      font-size: 1rem;
+      border-radius: 8px;
+      border: none;
+      background: #007bff;
+      color: #fff;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
   <h2 id="status">🔄 Loading...</h2>
   <p id="message"></p>
+  <div id="action" class="hidden"></div>
 
   <script>
     const query = new URLSearchParams(window.location.search);
@@ -28,6 +37,7 @@
 
     const statusEl = document.getElementById("status");
     const messageEl = document.getElementById("message");
+    const actionEl = document.getElementById("action");
 
     function storeManager(name) {
       localStorage.setItem("superdining_manager", name);
@@ -45,6 +55,12 @@
     function showStatus(title, message) {
       statusEl.textContent = title;
       messageEl.textContent = message || "";
+    }
+
+    function showProceedButton(onClick) {
+      actionEl.innerHTML = `<button>✅ Proceed with this browser</button>`;
+      actionEl.classList.remove("hidden");
+      actionEl.querySelector("button").onclick = onClick;
     }
 
     function getBrowserName() {
@@ -71,9 +87,7 @@
       return true;
     }
 
-    (function init() {
-      if (!ensureCorrectBrowser()) return;
-
+    function proceedFlow() {
       if (manager) {
         storeManager(manager);
         showStatus("✅ Manager Verified", `Hi ${manager}, now tap the outlet NFC tag to proceed.`);
@@ -88,8 +102,14 @@
       } else {
         showStatus("ℹ️ Invalid Access", "Please use the NFC tags to access this form.");
       }
-
       window.history.pushState({}, document.title, '/superdining/');
+    }
+
+    (function init() {
+      if (!ensureCorrectBrowser()) return;
+      // ask for confirmation first
+      showStatus("ℹ️ Confirm Browser", "You are using a supported browser. Do you want to proceed?");
+      showProceedButton(proceedFlow);
     })();
 
     // 🔒 Basic copy prevention
