@@ -1,42 +1,83 @@
-<script>
-  (function init() {
-    const query = new URLSearchParams(window.location.search);
-    const manager = query.get("manager");
-
-    if (manager) {
-      // Save manager to localStorage
-      localStorage.setItem("superdining_manager", manager);
-
-      // Show status text
-      document.getElementById("status").textContent = "✅ Manager Verified";
-      document.getElementById("message").textContent = `Hi ${manager}, redirecting...`;
-
-      // Build final link (base link you want to open)
-      const finalLink = `https://example.com/clockin?manager=${encodeURIComponent(manager)}`;
-
-      // Use Android intent:// scheme to force "Choose Browser" prompt
-      const intentLink = `intent://${finalLink.replace(/^https?:\/\//, '')}#Intent;scheme=https;end`;
-
-      // For iOS fallback (Apple doesn’t allow browser chooser, only Safari will open)
-      const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-
-      setTimeout(() => {
-        if (isIOS) {
-          window.location.href = finalLink; // will just open Safari
-        } else {
-          window.location.href = intentLink; // Android will show "Open with" dialog
-        }
-      }, 1500);
-
-    } else {
-      document.getElementById("status").textContent = "ℹ️ Invalid Access";
-      document.getElementById("message").textContent = "Please use the NFC tag or JotForm link.";
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Manager Clock-In Redirect</title>
+  <style>
+    body {font-family: sans-serif; text-align: center; padding: 2rem; background: #f9f9f9;}
+    h2 {margin-bottom: 1rem;}
+    button {
+      padding: 0.7rem 1.2rem; font-size: 1rem; border-radius: 8px;
+      border: none; background: #0073e6; color: #fff; cursor: pointer;
+      margin-top: 1rem; display: none;
     }
+    button:hover {background: #005bb5;}
+  </style>
+</head>
+<body>
+  <h2 id="status">🔄 Loading...</h2>
+  <p id="message"></p>
+  <button id="manualBtn">Open Link Manually</button>
 
-    // Clean URL (hide query string from address bar)
-    window.history.pushState({}, document.title, '/superdining/');
-  })();
-</script>
+  <script>
+    (function init() {
+      const query = new URLSearchParams(window.location.search);
+      let manager = query.get("manager");
+
+      // If manager in URL, store it
+      if (manager) {
+        manager = decodeURIComponent(manager).trim().replace(/\s+/g, "_");
+        localStorage.setItem("managerName", manager);
+      } else {
+        // Else try from storage
+        manager = localStorage.getItem("managerName");
+      }
+
+      if (manager) {
+        document.getElementById("status").textContent = "✅ Manager Verified";
+        document.getElementById("message").textContent = `Hi ${manager}, redirecting...`;
+
+        const finalLink = `https://muisloh.github.io/superdining/?manager=${encodeURIComponent(manager)}`;
+        const intentLink = `intent://${finalLink.replace(/^https?:\/\//, '')}#Intent;scheme=https;end`;
+        const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+        // Clean URL (remove ?manager=...)
+        if (window.history.replaceState) {
+          const cleanUrl = window.location.origin + window.location.pathname;
+          window.history.replaceState({}, document.title, cleanUrl);
+        }
+
+        // Redirect
+        setTimeout(() => {
+          try {
+            if (isIOS) {
+              window.location.href = finalLink;
+            } else {
+              window.location.href = intentLink;
+            }
+          } catch {
+            showManual(finalLink);
+          }
+        }, 1500);
+
+        function showManual(url) {
+          const btn = document.getElementById("manualBtn");
+          btn.style.display = "inline-block";
+          btn.onclick = () => window.location.href = url;
+          document.getElementById("message").textContent =
+            "⚠️ Auto redirect failed. Tap below to open:";
+        }
+
+      } else {
+        document.getElementById("status").textContent = "ℹ️ Invalid Access";
+        document.getElementById("message").textContent = "Please access through JotForm.";
+      }
+    })();
+  </script>
+</body>
+</html>
+
 
 
 
