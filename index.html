@@ -1,121 +1,286 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>SuperDining Manager Access</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Manager Clock-In Redirect</title>
   <style>
-    body { font-family: sans-serif; text-align: center; padding: 20px; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; text-align: center; padding: 2rem; }
     .hidden { display: none; }
-    button {
-      display: block;
-      margin: 10px auto;
-      padding: 12px 20px;
-      font-size: 16px;
-      border: none;
-      border-radius: 8px;
-      background: #007bff;
-      color: white;
-      cursor: pointer;
-    }
-    button:hover { background: #0056b3; }
-    .reset { background: #dc3545; }
-    .reset:hover { background: #a71d2a; }
+    .btn { display:inline-block; margin:.4rem .3rem; padding:.7rem 1.1rem; font-size:1rem; border:0; border-radius:10px; cursor:pointer; background:#0d6efd; color:#fff; }
+    .btn.alt { background:#6c757d; }
+    .btn.danger { background:#dc3545; }
+    #action, #browser-choice { margin-top: 1rem; }
+    #hint { font-size:.9rem; color:#666; margin-top:.5rem; }
   </style>
 </head>
 <body>
-  <h2>SuperDining Manager Verification</h2>
+  <h2 id="status">🔄 Loading…</h2>
+  <p id="message"></p>
   <div id="browser-choice" class="hidden"></div>
+  <div id="action" class="hidden"></div>
+  <div id="hint" class="hidden"></div>
 
   <script>
+    // ====== URL / Query ======
     const query = new URLSearchParams(window.location.search);
-    const manager = query.get("manager");
+    const manager = query.get("manager"); // e.g. from manager NFC
+    const outlet  = query.get("outlet");  // e.g. from outlet NFC
+    const currentUrl = window.location.href;
 
-    const browserChoiceEl = document.getElementById("browser-choice");
+    // ====== DOM ======
+    const statusEl  = document.getElementById("status");
+    const messageEl = document.getElementById("message");
+    const choiceEl  = document.getElementById("browser-choice");
+    const actionEl  = document.getElementById("action");
+    const hintEl    = document.getElementById("hint");
 
-    const browsers = {
-      chrome: { name: "Chrome", scheme: "googlechrome://" },
-      edge:   { name: "Edge",   scheme: "microsoft-edge:" },
-      firefox:{ name: "Firefox",scheme: "firefox://open-url?url=" },
-      current:{ name: "Current Browser", scheme: null }
-    };
+    // ====== Config ======
+    const jotformBase = "https://form.jotform.com/251891698588077";
+    const LS_MANAGER_KEY = "superdining_manager";
+    const LS_BROWSER_KEY = "preferred_browser";
 
-    function testBrowserScheme(scheme) {
-      return new Promise(resolve => {
-        if (!scheme) return resolve(true); // allow "current"
-        let timeout = setTimeout(() => resolve(false), 800);
+    // ====== Helpers ======
+    const ua = navigator.userAgent || "";
+    const isAndroid = /Android/i.test(ua);
+    const isIOS     = /iPhone|iPad|iPod/i.test(ua);
+    const isChrome  = /Chrome/i.test(ua) && !/Edg\//.test(ua) && !/OPR\//.test(ua);
+    const isEdge    = /Edg\//.test(ua);
+    const isFirefox = /Firefox/i.test(ua);
+    const isSafari  = /^((?!chrome|android).)*safari/i.test(ua);
 
-        let iframe = document.createElement("iframe");
-        iframe.style.display = "none";
-        iframe.src = scheme + "example.com";
-        document.body.appendChild(iframe);
-
-        window.addEventListener("blur", () => {
-          clearTimeout(timeout);
-          resolve(true); // user switched to browser
-        }, { once: true });
-      });
+    function showStatus(title, msg="") {
+      statusEl.textContent = title;
+      messageEl.textContent = msg;
+    }
+    function setHint(text) {
+      hintEl.textContent = text;
+      hintEl.classList.remove("hidden");
     }
 
-    async function detectBrowsers() {
-      let available = [];
-      for (let key in browsers) {
-        if (await testBrowserScheme(browsers[key].scheme)) {
-          available.push(key);
+    function storeManager(name) { localStorage.setItem(LS_MANAGER_KEY, name); }
+    function getStoredManager() { return localStorage.getItem(LS_MANAGER_KEY); }
+
+    function saveBrowserChoice(choice) { localStorage.setItem(LS_BROWSER_KEY, choice); }
+    function getBrowserChoice() { return localStorage.getItem(LS_BROWSER_KEY); }
+    function resetBrowserChoice() { localStorage.removeItem(LS_BROWSER_KEY); renderBrowserChoice(); }
+
+    function redirectToForm(name, outlet) {
+      const url = `${jotformBase}?name=${encodeURIComponent(name)}&outlet=${encodeURIComponent(outlet)}`;
+      window.location.href = url;
+    }
+
+    // ====== Open same URL in chosen browser (best-effort) ======
+    function openInChosenBrowser(choice, url) {
+      // Fallback if nothing special is needed
+      if (choice === "current") { window.location.href = url; return; }
+
+      // Attempt platform-specific deep links
+      if (isAndroid) {
+        const u = new URL(url);
+        const scheme = u.protocol.replace(":","");
+        const pathAndQuery = u.pathname + u.search + u.hash;
+        const base = `intent://${u.host}${pathAndQuery}#Intent;scheme=${scheme};package=`;
+        const pkgMap = {
+          chrome:  "com.android.chrome",
+          edge:    "com.microsoft.emmx",
+          firefox: "org.mozilla.firefox",
+          samsung: "com.sec.android.app.sbrowser"
+        };
+        const pkg = pkgMap[choice];
+        if (pkg) {
+          const intent = `${base}${pkg};end`;
+          // Try to launch; if it fails, we keep going in current browser after fallback delay
+          try { window.location = intent; } catch(e) {}
+        } else {
+          window.location.href = url; // unknown choice fallback
+        }
+      } else if (isIOS) {
+        // iOS custom schemes
+        if (choice === "chrome") {
+          // googlechrome:// for http, googlechromes:// for https
+          const iosUrl = url.replace(/^https:\/\//, "googlechromes://").replace(/^http:\/\//, "googlechrome://");
+          window.location = iosUrl;
+        } else if (choice === "firefox") {
+          window.location = "firefox://open-url?url=" + encodeURIComponent(url);
+        } else if (choice === "safari") {
+          // Safari cannot be launched via scheme from another browser reliably. Show instructions.
+          alert("On iPhone, open in Safari via the Share menu → 'Open in Safari'.");
+        } else if (choice === "edge") {
+          // Some iOS builds support microsoft-edge-https://
+          const edgeUrl = url.replace(/^https:\/\//, "microsoft-edge-https://").replace(/^http:\/\//, "microsoft-edge-http://");
+          window.location = edgeUrl;
+        } else {
+          window.location.href = url;
+        }
+      } else {
+        // Desktop or unknown: just continue
+        window.location.href = url;
+      }
+
+      // Fallback: if the deep link didn't steal focus, proceed in current browser after 1.2s
+      setTimeout(() => {
+        // If user is still here, just continue
+        if (document.visibilityState === "visible") window.location.href = url;
+      }, 1200);
+    }
+
+    // ====== UI: browser choice ======
+    function renderBrowserChoice() {
+      // Always allow changing – no dependency on query params
+      choiceEl.innerHTML = "";
+      const title = document.createElement("p");
+      title.textContent = "Choose a browser to continue:";
+      choiceEl.appendChild(title);
+
+      const list = document.createElement("div");
+
+      // Build buttons based on platform
+      const buttons = [];
+      if (isAndroid) {
+        buttons.push({key:"chrome",  label:"Open in Chrome"});
+        buttons.push({key:"edge",    label:"Open in Edge"});
+        buttons.push({key:"firefox", label:"Open in Firefox"});
+        buttons.push({key:"samsung", label:"Open in Samsung Internet"});
+      } else if (isIOS) {
+        buttons.push({key:"safari",  label:"Use Safari (recommended)"}); // will show tip
+        buttons.push({key:"chrome",  label:"Open in Chrome"});
+        buttons.push({key:"firefox", label:"Open in Firefox"});
+        buttons.push({key:"edge",    label:"Open in Edge"});
+      } else {
+        buttons.push({key:"current", label:"Continue with Current Browser"});
+      }
+      // Always include current browser option
+      buttons.push({key:"current", label:"Continue with Current Browser"});
+
+      buttons.forEach(b => {
+        const btn = document.createElement("button");
+        btn.className = "btn";
+        if (b.key === "current") btn.classList.add("alt");
+        btn.textContent = b.label;
+        btn.onclick = () => {
+          saveBrowserChoice(b.key);
+          openInChosenBrowser(b.key, currentUrl);
+        };
+        list.appendChild(btn);
+      });
+
+      // Reset button (always show)
+      const reset = document.createElement("button");
+      reset.className = "btn danger";
+      reset.textContent = "Change Browser (Reset Choice)";
+      reset.onclick = () => {
+        localStorage.removeItem(LS_BROWSER_KEY);
+        // Show the chooser immediately again
+        renderBrowserChoice();
+        showStatus("🔁 Browser Choice Reset", "Please pick your preferred browser.");
+      };
+
+      choiceEl.appendChild(list);
+      choiceEl.appendChild(reset);
+      choiceEl.classList.remove("hidden");
+
+      if (isIOS) {
+        setHint("Tip: To open in Safari, use the Share button and choose “Open in Safari”.");
+      }
+    }
+
+    // ====== Core Flow ======
+    function proceedFlow() {
+      // Manager tap → store
+      if (manager) {
+        storeManager(manager);
+        showStatus("✅ Manager Verified", `Hi ${manager}, now tap the outlet NFC tag to proceed.`);
+        // Hide query from the bar after we’re done using it
+        safeHideQuery();
+        return;
+      }
+
+      // Outlet tap → redirect if we have a manager stored
+      if (outlet) {
+        const storedManager = getStoredManager();
+        if (storedManager) {
+          showStatus("✅ Redirecting…", `Manager: ${storedManager} • Outlet: ${outlet}`);
+          redirectToForm(storedManager, outlet);
+          return;
+        } else {
+          showStatus("❌ Access Denied", "Please tap your manager NFC tag first.");
+          return;
         }
       }
-      return available;
+
+      // No params
+      showStatus("ℹ️ Invalid Access", "Please use the NFC tags to access this form.");
     }
 
-    function renderChoice(available) {
-      browserChoiceEl.innerHTML = `<p>👉 Please choose your browser:</p>`;
-      available.forEach(key => {
-        const btn = document.createElement("button");
-        btn.innerText = browsers[key].name;
-        btn.onclick = () => {
-          localStorage.setItem("preferred_browser", key);
-          reopenInBrowser(key);
-        };
-        browserChoiceEl.appendChild(btn);
-      });
+    function safeHideQuery() {
+      // Clean URL after processing so the link is harder to copy/share
+      try { window.history.replaceState({}, document.title, '/superdining/'); } catch(e) {}
+    }
 
-      // reset option
-      const resetBtn = document.createElement("button");
-      resetBtn.innerText = "Reset Browser Choice";
-      resetBtn.className = "reset";
-      resetBtn.onclick = () => {
-        localStorage.removeItem("preferred_browser");
-        location.reload();
+    function maybeAutoSwitchToPreferred() {
+      const pref = getBrowserChoice();
+      if (!pref) return false;
+
+      // If user already in preferred browser, don’t switch
+      const inPref =
+        (pref === "chrome"  && isChrome) ||
+        (pref === "edge"    && isEdge)   ||
+        (pref === "firefox" && isFirefox)||
+        (pref === "safari"  && isSafari) ||
+        (pref === "samsung" && /SamsungBrowser/i.test(ua)) ||
+        (pref === "current");
+
+      if (inPref) return false;
+
+      // Try to reopen in preferred; if it fails, we’ll continue here
+      openInChosenBrowser(pref, currentUrl);
+      return true;
+    }
+
+    (function init() {
+      // If no preferred browser saved yet → prompt right away
+      if (!getBrowserChoice()) {
+        showStatus("🌐 Choose Your Browser", "Pick your preferred browser, we’ll remember it.");
+        renderBrowserChoice();
+        return;
+      }
+
+      // If a preferred browser exists but this isn’t it, auto-switch (best effort)
+      const switching = maybeAutoSwitchToPreferred();
+      if (switching) {
+        // We’ll continue here if deep-link fails (fallback timer inside)
+        showStatus("🔀 Switching Browser…", "If nothing happens, we’ll continue here automatically.");
+        // Don’t proceedFlow immediately to avoid double actions
+        setTimeout(() => { proceedFlow(); }, 1400);
+        return;
+      }
+
+      // Normal flow (already in preferred browser)
+      proceedFlow();
+
+      // Always show a small “change browser” action at the bottom
+      actionEl.innerHTML = `<button class="btn danger">Change Browser</button>`;
+      actionEl.classList.remove("hidden");
+      actionEl.querySelector("button").onclick = () => {
+        resetBrowserChoice();
       };
-      browserChoiceEl.appendChild(resetBtn);
 
-      browserChoiceEl.classList.remove("hidden");
-    }
-
-    function reopenInBrowser(choice) {
-      const currentUrl = window.location.href;
-      const b = browsers[choice];
-      if (choice === "chrome") {
-        window.location = b.scheme + currentUrl.replace(/^https?:\/\//, "");
-      } else if (choice === "edge") {
-        window.location = b.scheme + currentUrl;
-      } else if (choice === "firefox") {
-        window.location = b.scheme + currentUrl;
-      } else {
-        window.location = currentUrl;
-      }
-    }
-
-    (async function init() {
-      const savedChoice = localStorage.getItem("preferred_browser");
-
-      if (manager && !savedChoice) {
-        const available = await detectBrowsers();
-        renderChoice(available);
-      } else {
-        // continue with NFC/Jotform flow
-        console.log("Browser already chosen:", savedChoice);
-      }
+      // Hide query after we’ve applied logic
+      safeHideQuery();
     })();
+
+    // ====== Copy / Inspect discouragers (best-effort) ======
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('selectstart', e => e.preventDefault());
+    document.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'u')) e.preventDefault();
+    });
+    let lpTimer;
+    document.addEventListener('touchstart', () => {
+      lpTimer = setTimeout(() => { alert("Action blocked."); }, 600);
+    });
+    document.addEventListener('touchend', () => clearTimeout(lpTimer));
   </script>
 </body>
 </html>
