@@ -10,23 +10,24 @@
       text-align: center;
       padding: 2rem;
     }
-    .hidden { display: none; }
-    button {
-      margin-top: 1rem;
-      padding: 0.6rem 1.2rem;
+    #browser-choice button {
+      display: block;
+      margin: 0.5rem auto;
+      padding: 0.8rem 1.2rem;
       font-size: 1rem;
       border-radius: 8px;
       border: none;
       background: #007bff;
-      color: #fff;
+      color: white;
       cursor: pointer;
     }
+    #browser-choice { margin-top: 1rem; }
   </style>
 </head>
 <body>
   <h2 id="status">🔄 Loading...</h2>
   <p id="message"></p>
-  <div id="action" class="hidden"></div>
+  <div id="browser-choice" class="hidden"></div>
 
   <script>
     const query = new URLSearchParams(window.location.search);
@@ -37,7 +38,7 @@
 
     const statusEl = document.getElementById("status");
     const messageEl = document.getElementById("message");
-    const actionEl = document.getElementById("action");
+    const browserChoiceEl = document.getElementById("browser-choice");
 
     function storeManager(name) {
       localStorage.setItem("superdining_manager", name);
@@ -57,62 +58,38 @@
       messageEl.textContent = message || "";
     }
 
-    function showProceedButton(onClick) {
-      actionEl.innerHTML = `<button>✅ Proceed with this browser</button>`;
-      actionEl.classList.remove("hidden");
-      actionEl.querySelector("button").onclick = onClick;
+    function offerBrowserChoice(targetUrl) {
+      browserChoiceEl.innerHTML = `
+        <p>Choose a browser to continue:</p>
+        <button onclick="window.location='googlechrome://${targetUrl.replace(/^https?:\/\//,'')}'">Open in Chrome</button>
+        <button onclick="window.location='microsoft-edge:${targetUrl}'">Open in Edge</button>
+        <button onclick="window.location='firefox://open-url?url=${targetUrl}'">Open in Firefox</button>
+        <button onclick="window.location='${targetUrl}'">Continue with Current Browser</button>
+      `;
+      browserChoiceEl.classList.remove("hidden");
     }
 
-    function getBrowserName() {
-      const ua = navigator.userAgent.toLowerCase();
-      if (ua.includes("android")) {
-        if (!ua.includes("chrome")) return "not-chrome";
-      }
-      if (ua.includes("iphone") || ua.includes("ipad")) {
-        if (!ua.includes("safari") || ua.includes("crios") || ua.includes("fxios")) return "not-safari";
-      }
-      return "ok";
-    }
-
-    function ensureCorrectBrowser() {
-      const browserCheck = getBrowserName();
-      if (browserCheck === "not-chrome") {
-        showStatus("🔒 Open in Chrome", "Please open this link using Google Chrome.");
-        return false;
-      }
-      if (browserCheck === "not-safari") {
-        showStatus("🔒 Open in Safari", "Please open this link using Safari browser.");
-        return false;
-      }
-      return true;
-    }
-
-    function proceedFlow() {
+    (function init() {
       if (manager) {
         storeManager(manager);
         showStatus("✅ Manager Verified", `Hi ${manager}, now tap the outlet NFC tag to proceed.`);
       } else if (outlet) {
         const storedManager = getStoredManager();
         if (storedManager) {
-          showStatus("✅ Redirecting...", `Manager: ${storedManager}, Outlet: ${outlet}`);
-          redirectToForm(storedManager, outlet);
+          const targetUrl = `${jotformBase}?name=${encodeURIComponent(storedManager)}&outlet=${encodeURIComponent(outlet)}`;
+          showStatus("✅ Ready", `Manager: ${storedManager}, Outlet: ${outlet}`);
+          offerBrowserChoice(targetUrl);
         } else {
           showStatus("❌ Access Denied", "Please tap your manager NFC tag first.");
         }
       } else {
         showStatus("ℹ️ Invalid Access", "Please use the NFC tags to access this form.");
       }
-      window.history.pushState({}, document.title, '/superdining/');
-    }
 
-    (function init() {
-      if (!ensureCorrectBrowser()) return;
-      // ask for confirmation first
-      showStatus("ℹ️ Confirm Browser", "You are using a supported browser. Do you want to proceed?");
-      showProceedButton(proceedFlow);
+      window.history.pushState({}, document.title, '/superdining/');
     })();
 
-    // 🔒 Basic copy prevention
+    // 🔒 Copy prevention
     document.addEventListener('contextmenu', e => e.preventDefault());
     document.addEventListener('selectstart', e => e.preventDefault());
     document.addEventListener('keydown', e => {
