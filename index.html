@@ -1,109 +1,121 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Manager Clock-In Redirect</title>
+  <meta charset="UTF-8">
+  <title>SuperDining Manager Access</title>
   <style>
-    body {
-      font-family: sans-serif;
-      text-align: center;
-      padding: 2rem;
-    }
-    #browser-choice button {
+    body { font-family: sans-serif; text-align: center; padding: 20px; }
+    .hidden { display: none; }
+    button {
       display: block;
-      margin: 0.5rem auto;
-      padding: 0.8rem 1.2rem;
-      font-size: 1rem;
-      border-radius: 8px;
+      margin: 10px auto;
+      padding: 12px 20px;
+      font-size: 16px;
       border: none;
+      border-radius: 8px;
       background: #007bff;
       color: white;
       cursor: pointer;
     }
-    #browser-choice { margin-top: 1rem; }
+    button:hover { background: #0056b3; }
+    .reset { background: #dc3545; }
+    .reset:hover { background: #a71d2a; }
   </style>
 </head>
 <body>
-  <h2 id="status">🔄 Loading...</h2>
-  <p id="message"></p>
+  <h2>SuperDining Manager Verification</h2>
   <div id="browser-choice" class="hidden"></div>
 
   <script>
     const query = new URLSearchParams(window.location.search);
     const manager = query.get("manager");
-    const outlet = query.get("outlet");
 
-    const jotformBase = "https://form.jotform.com/251891698588077";
-
-    const statusEl = document.getElementById("status");
-    const messageEl = document.getElementById("message");
     const browserChoiceEl = document.getElementById("browser-choice");
 
-    function storeManager(name) {
-      localStorage.setItem("superdining_manager", name);
+    const browsers = {
+      chrome: { name: "Chrome", scheme: "googlechrome://" },
+      edge:   { name: "Edge",   scheme: "microsoft-edge:" },
+      firefox:{ name: "Firefox",scheme: "firefox://open-url?url=" },
+      current:{ name: "Current Browser", scheme: null }
+    };
+
+    function testBrowserScheme(scheme) {
+      return new Promise(resolve => {
+        if (!scheme) return resolve(true); // allow "current"
+        let timeout = setTimeout(() => resolve(false), 800);
+
+        let iframe = document.createElement("iframe");
+        iframe.style.display = "none";
+        iframe.src = scheme + "example.com";
+        document.body.appendChild(iframe);
+
+        window.addEventListener("blur", () => {
+          clearTimeout(timeout);
+          resolve(true); // user switched to browser
+        }, { once: true });
+      });
     }
 
-    function getStoredManager() {
-      return localStorage.getItem("superdining_manager");
+    async function detectBrowsers() {
+      let available = [];
+      for (let key in browsers) {
+        if (await testBrowserScheme(browsers[key].scheme)) {
+          available.push(key);
+        }
+      }
+      return available;
     }
 
-    function redirectToForm(name, outlet) {
-      const jotformUrl = `${jotformBase}?name=${encodeURIComponent(name)}&outlet=${encodeURIComponent(outlet)}`;
-      window.location.href = jotformUrl;
-    }
+    function renderChoice(available) {
+      browserChoiceEl.innerHTML = `<p>👉 Please choose your browser:</p>`;
+      available.forEach(key => {
+        const btn = document.createElement("button");
+        btn.innerText = browsers[key].name;
+        btn.onclick = () => {
+          localStorage.setItem("preferred_browser", key);
+          reopenInBrowser(key);
+        };
+        browserChoiceEl.appendChild(btn);
+      });
 
-    function showStatus(title, message) {
-      statusEl.textContent = title;
-      messageEl.textContent = message || "";
-    }
+      // reset option
+      const resetBtn = document.createElement("button");
+      resetBtn.innerText = "Reset Browser Choice";
+      resetBtn.className = "reset";
+      resetBtn.onclick = () => {
+        localStorage.removeItem("preferred_browser");
+        location.reload();
+      };
+      browserChoiceEl.appendChild(resetBtn);
 
-    function offerBrowserChoice(targetUrl) {
-      browserChoiceEl.innerHTML = `
-        <p>Choose a browser to continue:</p>
-        <button onclick="window.location='googlechrome://${targetUrl.replace(/^https?:\/\//,'')}'">Open in Chrome</button>
-        <button onclick="window.location='microsoft-edge:${targetUrl}'">Open in Edge</button>
-        <button onclick="window.location='firefox://open-url?url=${targetUrl}'">Open in Firefox</button>
-        <button onclick="window.location='${targetUrl}'">Continue with Current Browser</button>
-      `;
       browserChoiceEl.classList.remove("hidden");
     }
 
-    (function init() {
-      if (manager) {
-        storeManager(manager);
-        showStatus("✅ Manager Verified", `Hi ${manager}, now tap the outlet NFC tag to proceed.`);
-      } else if (outlet) {
-        const storedManager = getStoredManager();
-        if (storedManager) {
-          const targetUrl = `${jotformBase}?name=${encodeURIComponent(storedManager)}&outlet=${encodeURIComponent(outlet)}`;
-          showStatus("✅ Ready", `Manager: ${storedManager}, Outlet: ${outlet}`);
-          offerBrowserChoice(targetUrl);
-        } else {
-          showStatus("❌ Access Denied", "Please tap your manager NFC tag first.");
-        }
+    function reopenInBrowser(choice) {
+      const currentUrl = window.location.href;
+      const b = browsers[choice];
+      if (choice === "chrome") {
+        window.location = b.scheme + currentUrl.replace(/^https?:\/\//, "");
+      } else if (choice === "edge") {
+        window.location = b.scheme + currentUrl;
+      } else if (choice === "firefox") {
+        window.location = b.scheme + currentUrl;
       } else {
-        showStatus("ℹ️ Invalid Access", "Please use the NFC tags to access this form.");
+        window.location = currentUrl;
       }
+    }
 
-      window.history.pushState({}, document.title, '/superdining/');
+    (async function init() {
+      const savedChoice = localStorage.getItem("preferred_browser");
+
+      if (manager && !savedChoice) {
+        const available = await detectBrowsers();
+        renderChoice(available);
+      } else {
+        // continue with NFC/Jotform flow
+        console.log("Browser already chosen:", savedChoice);
+      }
     })();
-
-    // 🔒 Copy prevention
-    document.addEventListener('contextmenu', e => e.preventDefault());
-    document.addEventListener('selectstart', e => e.preventDefault());
-    document.addEventListener('keydown', e => {
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'u')) {
-        e.preventDefault();
-      }
-    });
-    let longPressTimer;
-    document.addEventListener('touchstart', () => {
-      longPressTimer = setTimeout(() => {
-        alert("Action blocked.");
-      }, 600);
-    });
-    document.addEventListener('touchend', () => clearTimeout(longPressTimer));
   </script>
 </body>
 </html>
