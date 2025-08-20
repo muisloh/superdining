@@ -4,100 +4,51 @@
   <meta charset="UTF-8">
   <title>Super Dining Clock-In</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; text-align: center; }
-    .hidden { display: none; }
-    button { margin: 10px; padding: 10px 20px; font-size: 16px; }
+    body { margin:0; font-family: Arial, sans-serif; }
+    #status { text-align:center; padding:20px; font-size:18px; color:#444; }
+    iframe { width:100%; height:100vh; border:none; display:none; }
   </style>
 </head>
 <body>
   <h2 id="status">Loading...</h2>
-  <div id="browserChoice" class="hidden">
-    <p>Select which browser you want to use for clock-in:</p>
-    <button onclick="saveBrowser('Chrome')">Chrome</button>
-    <button onclick="saveBrowser('Safari')">Safari</button>
-    <button onclick="saveBrowser('Edge')">Edge</button>
-    <button onclick="saveBrowser('Firefox')">Firefox</button>
-  </div>
-  <div>
-    <button onclick="resetBrowser()">Reset Browser</button>
-  </div>
+  <iframe id="jotformFrame"></iframe>
 
   <script>
     const jotformURL = "https://form.jotform.com/251891698588077";
-
     const urlParams = new URLSearchParams(window.location.search);
-    const managerFromLink = urlParams.get("manager");
     const outletFromLink = urlParams.get("outlet");
-
-    const savedBrowser = localStorage.getItem("preferredBrowser");
-    const savedManager = localStorage.getItem("managerName");
+    const managerFromCache = localStorage.getItem("managerName");
 
     const status = document.getElementById("status");
-    const browserChoice = document.getElementById("browserChoice");
+    const iframe = document.getElementById("jotformFrame");
 
-    // --- Redirect using POST (hide params in URL) ---
-    function redirectToJotform(manager, outlet) {
-      const form = document.createElement("form");
-      form.method = "POST";
-      form.action = jotformURL;
-
-      const managerInput = document.createElement("input");
-      managerInput.type = "hidden";
-      managerInput.name = "name";   // must match JotForm field unique name
-      managerInput.value = manager;
-      form.appendChild(managerInput);
-
-      const outletInput = document.createElement("input");
-      outletInput.type = "hidden";
-      outletInput.name = "outlet";  // must match JotForm field unique name
-      outletInput.value = outlet;
-      form.appendChild(outletInput);
-
-      document.body.appendChild(form);
-      form.submit();
-    }
-
-    function saveBrowser(choice) {
-      localStorage.setItem("preferredBrowser", choice);
-      status.innerText = "Browser saved (" + choice + "). Please tap NFC tag again.";
-      browserChoice.classList.add("hidden");
-    }
-
-    function resetBrowser() {
-      localStorage.removeItem("preferredBrowser");
-      localStorage.removeItem("managerName");
-      status.innerText = "Browser reset. Please click your manager link again to choose.";
-    }
-
-    // --- Main Logic ---
-    if (managerFromLink) {
-      // Manager clicked personal link
-      localStorage.setItem("managerName", managerFromLink);
-      if (savedBrowser) {
-        if (outletFromLink) {
-          redirectToJotform(managerFromLink, outletFromLink);
-        } else {
-          status.innerText = "Manager saved. Please tap NFC tag to clock in.";
-        }
-      } else {
-        status.innerText = "Please select your preferred browser for clock-in.";
-        browserChoice.classList.remove("hidden");
-      }
-    } else if (outletFromLink) {
-      // Outlet NFC tapped
-      if (!savedManager) {
-        status.innerText = "⚠️ Manager not set. Please click your manager link first.";
-      } else if (!savedBrowser) {
-        status.innerText = "Please click your manager link in this browser to set browser preference.";
-      } else {
-        redirectToJotform(savedManager, outletFromLink);
-      }
+    if (!managerFromCache) {
+      status.innerText = "⚠️ Manager not saved. Please click your manager link first.";
+    } else if (!outletFromLink) {
+      status.innerText = "⚠️ No outlet detected. Please tap NFC tag.";
     } else {
-      status.innerText = "Invalid access. Please tap NFC tag or click manager link.";
+      // Hide status & show form
+      status.style.display = "none";
+      iframe.style.display = "block";
+      iframe.src = jotformURL;
+
+      // Listen for form ready event
+      window.addEventListener("message", function(e) {
+        if (e.data && e.data.type === "jfEvent" && e.data.eventName === "formReady") {
+          iframe.contentWindow.postMessage({
+            "type": "setFieldsValue",
+            "value": {
+              "name": managerFromCache,
+              "outlet": outletFromLink
+            }
+          }, "*");
+        }
+      });
     }
   </script>
 </body>
 </html>
+
 
 
 
