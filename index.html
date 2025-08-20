@@ -35,7 +35,7 @@
     const status = document.getElementById("status");
     const browserChoice = document.getElementById("browserChoice");
 
-    // --- Redirect using POST (hide params from URL) ---
+    // --- Redirect using POST (hide params in URL) ---
     function redirectToJotform(manager, outlet) {
       const form = document.createElement("form");
       form.method = "POST";
@@ -43,13 +43,13 @@
 
       const managerInput = document.createElement("input");
       managerInput.type = "hidden";
-      managerInput.name = "name"; // must match JotForm field unique name
+      managerInput.name = "name";   // must match JotForm field unique name
       managerInput.value = manager;
       form.appendChild(managerInput);
 
       const outletInput = document.createElement("input");
       outletInput.type = "hidden";
-      outletInput.name = "outlet"; // must match JotForm field unique name
+      outletInput.name = "outlet";  // must match JotForm field unique name
       outletInput.value = outlet;
       form.appendChild(outletInput);
 
@@ -74,7 +74,6 @@
       // Manager clicked personal link
       localStorage.setItem("managerName", managerFromLink);
       if (savedBrowser) {
-        // If outlet also present, redirect directly
         if (outletFromLink) {
           redirectToJotform(managerFromLink, outletFromLink);
         } else {
@@ -99,5 +98,6 @@
   </script>
 </body>
 </html>
+
 
 
