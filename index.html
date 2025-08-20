@@ -3,284 +3,216 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Manager Clock-In Redirect</title>
+  <title>Super Dining • Clock-In Router</title>
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; text-align: center; padding: 2rem; }
-    .hidden { display: none; }
-    .btn { display:inline-block; margin:.4rem .3rem; padding:.7rem 1.1rem; font-size:1rem; border:0; border-radius:10px; cursor:pointer; background:#0d6efd; color:#fff; }
-    .btn.alt { background:#6c757d; }
-    .btn.danger { background:#dc3545; }
-    #action, #browser-choice { margin-top: 1rem; }
-    #hint { font-size:.9rem; color:#666; margin-top:.5rem; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; line-height:1.4; padding:24px; }
+    .card { max-width:560px; margin:0 auto; border:1px solid #e5e7eb; border-radius:14px; padding:20px; box-shadow:0 1px 3px rgba(0,0,0,.06); }
+    h2 { margin:0 0 8px; font-size:20px; }
+    p { margin:8px 0; color:#374151; }
+    .hint { color:#6b7280; font-size:14px; }
+    .row { margin-top:14px; display:flex; flex-wrap:wrap; gap:8px; }
+    button, .btn {
+      display:inline-block; padding:10px 14px; border:0; border-radius:10px; cursor:pointer; font-size:15px;
+      background:#111827; color:#fff; text-decoration:none;
+    }
+    .btn.alt { background:#4b5563; }
+    .btn.outline { background:#fff; color:#111827; border:1px solid #e5e7eb; }
+    .pill { display:inline-block; font-size:12px; padding:4px 8px; border-radius:999px; background:#f3f4f6; color:#111827; }
+    .ok { color:#065f46; }
+    .warn { color:#92400e; }
+    .danger { color:#991b1b; }
+    .small { font-size:13px; }
+    .divider { height:1px; background:#f3f4f6; margin:14px 0; }
   </style>
 </head>
 <body>
-  <h2 id="status">🔄 Loading…</h2>
-  <p id="message"></p>
-  <div id="browser-choice" class="hidden"></div>
-  <div id="action" class="hidden"></div>
-  <div id="hint" class="hidden"></div>
+  <div class="card" id="app">
+    <h2 id="title">Loading…</h2>
+    <p id="desc" class="hint"></p>
 
-  <script>
-    // ====== URL / Query ======
-    const query = new URLSearchParams(window.location.search);
-    const manager = query.get("manager"); // e.g. from manager NFC
-    const outlet  = query.get("outlet");  // e.g. from outlet NFC
-    const currentUrl = window.location.href;
+    <div id="manager-tools" style="display:none;">
+      <div class="divider"></div>
+      <p class="small"><span class="pill">Optional</span> Open this Manager Link in a different browser:</p>
+      <div class="row" id="browser-buttons"></div>
+      <p class="hint small" id="ios-tip" style="display:none;">On iPhone, if a button doesn’t open, use the Share menu → “Open in Safari/Chrome”.</p>
+      <div class="divider"></div>
+      <div class="row">
+        <button class="btn outline" id="clear-cache">Clear Manager Cache</button>
+        <a class="btn alt" id="retap-outlet" href="#" rel="nofollow">I’ve set my browser → Tap outlet NFC to clock-in</a>
+      </div>
+    </div>
+  </div>
 
-    // ====== DOM ======
-    const statusEl  = document.getElementById("status");
-    const messageEl = document.getElementById("message");
-    const choiceEl  = document.getElementById("browser-choice");
-    const actionEl  = document.getElementById("action");
-    const hintEl    = document.getElementById("hint");
+  <form id="hidden-post" method="POST" style="display:none;">
+    <!-- action is set in JS -->
+    <input type="hidden" name="name" />
+    <input type="hidden" name="outlet" />
+  </form>
 
-    // ====== Config ======
-    const jotformBase = "https://form.jotform.com/251891698588077";
-    const LS_MANAGER_KEY = "superdining_manager";
-    const LS_BROWSER_KEY = "preferred_browser";
+<script>
+  // ===== Config =====
+  const JOTFORM_BASE = "https://form.jotform.com/251891698588077";
+  const LS_MANAGER_KEY = "superdining_manager";
 
-    // ====== Helpers ======
-    const ua = navigator.userAgent || "";
-    const isAndroid = /Android/i.test(ua);
-    const isIOS     = /iPhone|iPad|iPod/i.test(ua);
-    const isChrome  = /Chrome/i.test(ua) && !/Edg\//.test(ua) && !/OPR\//.test(ua);
-    const isEdge    = /Edg\//.test(ua);
-    const isFirefox = /Firefox/i.test(ua);
-    const isSafari  = /^((?!chrome|android).)*safari/i.test(ua);
+  // ===== Helpers =====
+  const $ = sel => document.querySelector(sel);
+  const query = new URLSearchParams(window.location.search);
+  const managerParam = query.get("manager"); // from Manager Link
+  const outletParam  = query.get("outlet");  // from Outlet NFC
+  const ua = (navigator.userAgent || "").toLowerCase();
 
-    function showStatus(title, msg="") {
-      statusEl.textContent = title;
-      messageEl.textContent = msg;
-    }
-    function setHint(text) {
-      hintEl.textContent = text;
-      hintEl.classList.remove("hidden");
-    }
+  function setTitle(t){ $("#title").textContent = t; }
+  function setDesc(d){ $("#desc").textContent = d; }
+  function getStoredManager(){ return localStorage.getItem(LS_MANAGER_KEY); }
+  function storeManager(name){ localStorage.setItem(LS_MANAGER_KEY, name); }
+  function clearManager(){ localStorage.removeItem(LS_MANAGER_KEY); }
 
-    function storeManager(name) { localStorage.setItem(LS_MANAGER_KEY, name); }
-    function getStoredManager() { return localStorage.getItem(LS_MANAGER_KEY); }
+  function cleanUrlBar() {
+    try {
+      const clean = window.location.origin + window.location.pathname;
+      window.history.replaceState({}, document.title, clean);
+    } catch (e) {}
+  }
 
-    function saveBrowserChoice(choice) { localStorage.setItem(LS_BROWSER_KEY, choice); }
-    function getBrowserChoice() { return localStorage.getItem(LS_BROWSER_KEY); }
-    function resetBrowserChoice() { localStorage.removeItem(LS_BROWSER_KEY); renderBrowserChoice(); }
+  function detectBrowserName() {
+    // Order matters
+    if (ua.includes("edg")) return "Edge";
+    if (ua.includes("samsungbrowser")) return "Samsung Internet";
+    if (ua.includes("crios")) return "Chrome (iOS)";
+    if (ua.includes("fxios")) return "Firefox (iOS)";
+    if (ua.includes("chrome") && !ua.includes("edg")) return "Chrome";
+    if (ua.includes("firefox")) return "Firefox";
+    if (ua.includes("safari") && !ua.includes("chrome")) return "Safari";
+    return "your current browser";
+  }
 
-    function redirectToForm(name, outlet) {
-      const url = `${jotformBase}?name=${encodeURIComponent(name)}&outlet=${encodeURIComponent(outlet)}`;
-      window.location.href = url;
-    }
+  // Deep-link helpers to reopen THIS SAME URL in another browser app.
+  function deepLinkButtons() {
+    const url = window.location.href; // includes ?manager=...
+    const buttons = [];
 
-    // ====== Open same URL in chosen browser (best-effort) ======
-    function openInChosenBrowser(choice, url) {
-      // Fallback if nothing special is needed
-      if (choice === "current") { window.location.href = url; return; }
+    const isAndroid = /android/i.test(navigator.userAgent);
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 
-      // Attempt platform-specific deep links
-      if (isAndroid) {
-        const u = new URL(url);
-        const scheme = u.protocol.replace(":","");
-        const pathAndQuery = u.pathname + u.search + u.hash;
-        const base = `intent://${u.host}${pathAndQuery}#Intent;scheme=${scheme};package=`;
-        const pkgMap = {
-          chrome:  "com.android.chrome",
-          edge:    "com.microsoft.emmx",
-          firefox: "org.mozilla.firefox",
-          samsung: "com.sec.android.app.sbrowser"
-        };
-        const pkg = pkgMap[choice];
-        if (pkg) {
-          const intent = `${base}${pkg};end`;
-          // Try to launch; if it fails, we keep going in current browser after fallback delay
-          try { window.location = intent; } catch(e) {}
-        } else {
-          window.location.href = url; // unknown choice fallback
-        }
-      } else if (isIOS) {
-        // iOS custom schemes
-        if (choice === "chrome") {
-          // googlechrome:// for http, googlechromes:// for https
-          const iosUrl = url.replace(/^https:\/\//, "googlechromes://").replace(/^http:\/\//, "googlechrome://");
-          window.location = iosUrl;
-        } else if (choice === "firefox") {
-          window.location = "firefox://open-url?url=" + encodeURIComponent(url);
-        } else if (choice === "safari") {
-          // Safari cannot be launched via scheme from another browser reliably. Show instructions.
-          alert("On iPhone, open in Safari via the Share menu → 'Open in Safari'.");
-        } else if (choice === "edge") {
-          // Some iOS builds support microsoft-edge-https://
-          const edgeUrl = url.replace(/^https:\/\//, "microsoft-edge-https://").replace(/^http:\/\//, "microsoft-edge-http://");
-          window.location = edgeUrl;
-        } else {
-          window.location.href = url;
-        }
-      } else {
-        // Desktop or unknown: just continue
-        window.location.href = url;
-      }
+    if (isAndroid) {
+      const u = new URL(url);
+      const scheme = u.protocol.replace(":","");
+      const pathAndQuery = u.pathname + u.search + u.hash;
+      const base = `intent://${u.host}${pathAndQuery}#Intent;scheme=${scheme};package=`;
 
-      // Fallback: if the deep link didn't steal focus, proceed in current browser after 1.2s
-      setTimeout(() => {
-        // If user is still here, just continue
-        if (document.visibilityState === "visible") window.location.href = url;
-      }, 1200);
-    }
+      const androidTargets = [
+        { key:"chrome",  label:"Open in Chrome",  pkg:"com.android.chrome" },
+        { key:"samsung", label:"Open in Samsung Internet", pkg:"com.sec.android.app.sbrowser" },
+        { key:"edge",    label:"Open in Edge",    pkg:"com.microsoft.emmx" },
+        { key:"firefox", label:"Open in Firefox", pkg:"org.mozilla.firefox" },
+      ];
 
-    // ====== UI: browser choice ======
-    function renderBrowserChoice() {
-      // Always allow changing – no dependency on query params
-      choiceEl.innerHTML = "";
-      const title = document.createElement("p");
-      title.textContent = "Choose a browser to continue:";
-      choiceEl.appendChild(title);
-
-      const list = document.createElement("div");
-
-      // Build buttons based on platform
-      const buttons = [];
-      if (isAndroid) {
-        buttons.push({key:"chrome",  label:"Open in Chrome"});
-        buttons.push({key:"edge",    label:"Open in Edge"});
-        buttons.push({key:"firefox", label:"Open in Firefox"});
-        buttons.push({key:"samsung", label:"Open in Samsung Internet"});
-      } else if (isIOS) {
-        buttons.push({key:"safari",  label:"Use Safari (recommended)"}); // will show tip
-        buttons.push({key:"chrome",  label:"Open in Chrome"});
-        buttons.push({key:"firefox", label:"Open in Firefox"});
-        buttons.push({key:"edge",    label:"Open in Edge"});
-      } else {
-        buttons.push({key:"current", label:"Continue with Current Browser"});
-      }
-      // Always include current browser option
-      buttons.push({key:"current", label:"Continue with Current Browser"});
-
-      buttons.forEach(b => {
-        const btn = document.createElement("button");
-        btn.className = "btn";
-        if (b.key === "current") btn.classList.add("alt");
-        btn.textContent = b.label;
-        btn.onclick = () => {
-          saveBrowserChoice(b.key);
-          openInChosenBrowser(b.key, currentUrl);
-        };
-        list.appendChild(btn);
+      androidTargets.forEach(t => {
+        const a = document.createElement("a");
+        a.className = "btn outline";
+        a.textContent = t.label;
+        a.href = `${base}${t.pkg};end`;
+        a.rel = "nofollow";
+        buttons.push(a);
       });
+    } else if (isIOS) {
+      // iOS custom schemes
+      const chromeUrl  = url.replace(/^https:\/\//, "googlechromes://").replace(/^http:\/\//, "googlechrome://");
+      const edgeUrl    = url.replace(/^https:\/\//, "microsoft-edge-https://").replace(/^http:\/\//, "microsoft-edge-http://");
+      const firefoxUrl = "firefox://open-url?url=" + encodeURIComponent(url);
+      // Safari: usually use Share → Open in Safari; direct scheme not reliable cross-app
 
-      // Reset button (always show)
-      const reset = document.createElement("button");
-      reset.className = "btn danger";
-      reset.textContent = "Change Browser (Reset Choice)";
-      reset.onclick = () => {
-        localStorage.removeItem(LS_BROWSER_KEY);
-        // Show the chooser immediately again
-        renderBrowserChoice();
-        showStatus("🔁 Browser Choice Reset", "Please pick your preferred browser.");
+      const targets = [
+        { label:"Open in Safari (use Share → Open in Safari)", href:"#", note:"safari" },
+        { label:"Open in Chrome",  href: chromeUrl },
+        { label:"Open in Edge",    href: edgeUrl },
+        { label:"Open in Firefox", href: firefoxUrl },
+      ];
+
+      targets.forEach(t => {
+        const a = document.createElement("a");
+        a.className = "btn outline";
+        a.textContent = t.label;
+        a.href = t.href;
+        a.rel = "nofollow";
+        buttons.push(a);
+      });
+      $("#ios-tip").style.display = "block";
+    } else {
+      // Desktop fallback – just show same-window option
+      const a = document.createElement("a");
+      a.className = "btn outline";
+      a.textContent = "Open Here";
+      a.href = url;
+      a.rel = "nofollow";
+      buttons.push(a);
+    }
+
+    return buttons;
+  }
+
+  function redirectToJotFormPOST(name, outlet) {
+    // Always clean the visible URL BEFORE redirect
+    cleanUrlBar();
+    const form = $("#hidden-post");
+    form.action = JOTFORM_BASE;
+    form.elements.name.value = name;
+    form.elements.outlet.value = outlet;
+    form.submit();
+  }
+
+  // ===== Core Flow =====
+  (function init(){
+    const currentBrowser = detectBrowserName();
+
+    if (managerParam) {
+      // MANAGER LINK FLOW
+      storeManager(managerParam);
+      cleanUrlBar();
+
+      setTitle("✅ Manager Saved");
+      setDesc(`Hi ${managerParam}. From now on, please tap the outlet NFC tag in <b>${currentBrowser}</b> to clock in. If this isn’t the browser you want, you can open this Manager Link in another browser below.`);
+
+      // Show manager tools: deep-link buttons + clear cache + retap hint
+      const btnBox = $("#browser-buttons");
+      deepLinkButtons().forEach(btn => btnBox.appendChild(btn));
+      $("#manager-tools").style.display = "block";
+
+      $("#clear-cache").onclick = () => {
+        clearManager();
+        setTitle("🔁 Manager Cache Cleared");
+        setDesc(`Cache removed. Open your Manager Link in your preferred browser to save it again. Then tap the outlet NFC tag in that same browser.`);
       };
-
-      choiceEl.appendChild(list);
-      choiceEl.appendChild(reset);
-      choiceEl.classList.remove("hidden");
-
-      if (isIOS) {
-        setHint("Tip: To open in Safari, use the Share button and choose “Open in Safari”.");
-      }
-    }
-
-    // ====== Core Flow ======
-    function proceedFlow() {
-      // Manager tap → store
-      if (manager) {
-        storeManager(manager);
-        showStatus("✅ Manager Verified", `Hi ${manager}, now tap the outlet NFC tag to proceed.`);
-        // Hide query from the bar after we’re done using it
-        safeHideQuery();
-        return;
-      }
-
-      // Outlet tap → redirect if we have a manager stored
-      if (outlet) {
-        const storedManager = getStoredManager();
-        if (storedManager) {
-          showStatus("✅ Redirecting…", `Manager: ${storedManager} • Outlet: ${outlet}`);
-          redirectToForm(storedManager, outlet);
-          return;
-        } else {
-          showStatus("❌ Access Denied", "Please tap your manager NFC tag first.");
-          return;
-        }
-      }
-
-      // No params
-      showStatus("ℹ️ Invalid Access", "Please use the NFC tags to access this form.");
-    }
-
-    function safeHideQuery() {
-      // Clean URL after processing so the link is harder to copy/share
-      try { window.history.replaceState({}, document.title, '/superdining/'); } catch(e) {}
-    }
-
-    function maybeAutoSwitchToPreferred() {
-      const pref = getBrowserChoice();
-      if (!pref) return false;
-
-      // If user already in preferred browser, don’t switch
-      const inPref =
-        (pref === "chrome"  && isChrome) ||
-        (pref === "edge"    && isEdge)   ||
-        (pref === "firefox" && isFirefox)||
-        (pref === "safari"  && isSafari) ||
-        (pref === "samsung" && /SamsungBrowser/i.test(ua)) ||
-        (pref === "current");
-
-      if (inPref) return false;
-
-      // Try to reopen in preferred; if it fails, we’ll continue here
-      openInChosenBrowser(pref, currentUrl);
-      return true;
-    }
-
-    (function init() {
-      // If no preferred browser saved yet → prompt right away
-      if (!getBrowserChoice()) {
-        showStatus("🌐 Choose Your Browser", "Pick your preferred browser, we’ll remember it.");
-        renderBrowserChoice();
-        return;
-      }
-
-      // If a preferred browser exists but this isn’t it, auto-switch (best effort)
-      const switching = maybeAutoSwitchToPreferred();
-      if (switching) {
-        // We’ll continue here if deep-link fails (fallback timer inside)
-        showStatus("🔀 Switching Browser…", "If nothing happens, we’ll continue here automatically.");
-        // Don’t proceedFlow immediately to avoid double actions
-        setTimeout(() => { proceedFlow(); }, 1400);
-        return;
-      }
-
-      // Normal flow (already in preferred browser)
-      proceedFlow();
-
-      // Always show a small “change browser” action at the bottom
-      actionEl.innerHTML = `<button class="btn danger">Change Browser</button>`;
-      actionEl.classList.remove("hidden");
-      actionEl.querySelector("button").onclick = () => {
-        resetBrowserChoice();
+      $("#retap-outlet").onclick = (e) => {
+        e.preventDefault();
+        setTitle("📍 Next Step");
+        setDesc(`Now tap the outlet NFC tag in <b>${currentBrowser}</b> to proceed to clock in.`);
       };
+      return;
+    }
 
-      // Hide query after we’ve applied logic
-      safeHideQuery();
-    })();
+    if (outletParam) {
+      // OUTLET NFC FLOW
+      const storedManager = getStoredManager();
+      if (storedManager) {
+        setTitle("⏳ Redirecting to Clock-In…");
+        setDesc(`Manager: <b>${storedManager}</b> • Outlet: <b>${outletParam}</b>`);
+        // Hidden POST to JotForm (no URL params shown)
+        redirectToJotFormPOST(storedManager, outletParam);
+      } else {
+        // No manager cache yet → instruct to open Manager Link IN THIS BROWSER
+        cleanUrlBar();
+        setTitle("👋 One-time Setup Needed");
+        setDesc(`You’re using <b>${currentBrowser}</b>. Please open your <b>Manager Link</b> in <b>${currentBrowser}</b> to save your manager name, then tap the outlet NFC tag again to clock in.`);
+      }
+      return;
+    }
 
-    // ====== Copy / Inspect discouragers (best-effort) ======
-    document.addEventListener('contextmenu', e => e.preventDefault());
-    document.addEventListener('selectstart', e => e.preventDefault());
-    document.addEventListener('keydown', e => {
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'u')) e.preventDefault();
-    });
-    let lpTimer;
-    document.addEventListener('touchstart', () => {
-      lpTimer = setTimeout(() => { alert("Action blocked."); }, 600);
-    });
-    document.addEventListener('touchend', () => clearTimeout(lpTimer));
-  </script>
+    // No recognizable params
+    cleanUrlBar();
+    setTitle("ℹ️ How to Use");
+    setDesc(`1) Tap your <b>Manager Link</b> in your preferred browser (this saves your manager name in that browser).<br/>2) Then, at the outlet, tap the <b>Outlet NFC tag</b> in the <u>same browser</u> to clock in.`);
+  })();
+</script>
 </body>
 </html>
