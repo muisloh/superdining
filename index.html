@@ -35,13 +35,26 @@
     const status = document.getElementById("status");
     const browserChoice = document.getElementById("browserChoice");
 
+    // --- Redirect using POST (hide params from URL) ---
     function redirectToJotform(manager, outlet) {
-      const params = new URLSearchParams({
-        name: manager || "",
-        outlet: outlet || ""
-      });
-      // ✅ Pass correct field codes into JotForm
-      window.location.href = jotformURL + "?" + params.toString();
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = jotformURL;
+
+      const managerInput = document.createElement("input");
+      managerInput.type = "hidden";
+      managerInput.name = "name"; // must match JotForm field unique name
+      managerInput.value = manager;
+      form.appendChild(managerInput);
+
+      const outletInput = document.createElement("input");
+      outletInput.type = "hidden";
+      outletInput.name = "outlet"; // must match JotForm field unique name
+      outletInput.value = outlet;
+      form.appendChild(outletInput);
+
+      document.body.appendChild(form);
+      form.submit();
     }
 
     function saveBrowser(choice) {
@@ -86,4 +99,5 @@
   </script>
 </body>
 </html>
+
 
