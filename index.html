@@ -44,9 +44,8 @@
   </div>
 
   <form id="hidden-post" method="POST" style="display:none;">
-    <!-- action is set in JS -->
-    <input type="hidden" name="name" />
-    <input type="hidden" name="outlet" />
+    <input type="hidden" name="q3_managerName" /> <!-- JotForm 'name' field -->
+    <input type="hidden" name="q4_outlet" /> <!-- JotForm 'outlet' field -->
   </form>
 
 <script>
@@ -62,7 +61,7 @@
   const ua = (navigator.userAgent || "").toLowerCase();
 
   function setTitle(t){ $("#title").textContent = t; }
-  function setDesc(d){ $("#desc").textContent = d; }
+  function setDesc(d){ $("#desc").innerHTML = d; }
   function getStoredManager(){ return localStorage.getItem(LS_MANAGER_KEY); }
   function storeManager(name){ localStorage.setItem(LS_MANAGER_KEY, name); }
   function clearManager(){ localStorage.removeItem(LS_MANAGER_KEY); }
@@ -75,7 +74,6 @@
   }
 
   function detectBrowserName() {
-    // Order matters
     if (ua.includes("edg")) return "Edge";
     if (ua.includes("samsungbrowser")) return "Samsung Internet";
     if (ua.includes("crios")) return "Chrome (iOS)";
@@ -86,11 +84,9 @@
     return "your current browser";
   }
 
-  // Deep-link helpers to reopen THIS SAME URL in another browser app.
   function deepLinkButtons() {
-    const url = window.location.href; // includes ?manager=...
+    const url = window.location.href;
     const buttons = [];
-
     const isAndroid = /android/i.test(navigator.userAgent);
     const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 
@@ -101,10 +97,10 @@
       const base = `intent://${u.host}${pathAndQuery}#Intent;scheme=${scheme};package=`;
 
       const androidTargets = [
-        { key:"chrome",  label:"Open in Chrome",  pkg:"com.android.chrome" },
-        { key:"samsung", label:"Open in Samsung Internet", pkg:"com.sec.android.app.sbrowser" },
-        { key:"edge",    label:"Open in Edge",    pkg:"com.microsoft.emmx" },
-        { key:"firefox", label:"Open in Firefox", pkg:"org.mozilla.firefox" },
+        { label:"Open in Chrome",  pkg:"com.android.chrome" },
+        { label:"Open in Samsung Internet", pkg:"com.sec.android.app.sbrowser" },
+        { label:"Open in Edge",    pkg:"com.microsoft.emmx" },
+        { label:"Open in Firefox", pkg:"org.mozilla.firefox" },
       ];
 
       androidTargets.forEach(t => {
@@ -116,14 +112,12 @@
         buttons.push(a);
       });
     } else if (isIOS) {
-      // iOS custom schemes
       const chromeUrl  = url.replace(/^https:\/\//, "googlechromes://").replace(/^http:\/\//, "googlechrome://");
       const edgeUrl    = url.replace(/^https:\/\//, "microsoft-edge-https://").replace(/^http:\/\//, "microsoft-edge-http://");
       const firefoxUrl = "firefox://open-url?url=" + encodeURIComponent(url);
-      // Safari: usually use Share → Open in Safari; direct scheme not reliable cross-app
 
       const targets = [
-        { label:"Open in Safari (use Share → Open in Safari)", href:"#", note:"safari" },
+        { label:"Open in Safari (use Share → Open in Safari)", href:"#"},
         { label:"Open in Chrome",  href: chromeUrl },
         { label:"Open in Edge",    href: edgeUrl },
         { label:"Open in Firefox", href: firefoxUrl },
@@ -139,7 +133,6 @@
       });
       $("#ios-tip").style.display = "block";
     } else {
-      // Desktop fallback – just show same-window option
       const a = document.createElement("a");
       a.className = "btn outline";
       a.textContent = "Open Here";
@@ -147,17 +140,15 @@
       a.rel = "nofollow";
       buttons.push(a);
     }
-
     return buttons;
   }
 
   function redirectToJotFormPOST(name, outlet) {
-    // Always clean the visible URL BEFORE redirect
     cleanUrlBar();
     const form = $("#hidden-post");
     form.action = JOTFORM_BASE;
-    form.elements.name.value = name;
-    form.elements.outlet.value = outlet;
+    form.elements.q3_managerName.value = name;   // manager -> {name}
+    form.elements.q4_outlet.value = outlet;      // outlet  -> {outlet}
     form.submit();
   }
 
@@ -166,14 +157,12 @@
     const currentBrowser = detectBrowserName();
 
     if (managerParam) {
-      // MANAGER LINK FLOW
       storeManager(managerParam);
       cleanUrlBar();
 
       setTitle("✅ Manager Saved");
       setDesc(`Hi ${managerParam}. From now on, please tap the outlet NFC tag in <b>${currentBrowser}</b> to clock in. If this isn’t the browser you want, you can open this Manager Link in another browser below.`);
 
-      // Show manager tools: deep-link buttons + clear cache + retap hint
       const btnBox = $("#browser-buttons");
       deepLinkButtons().forEach(btn => btnBox.appendChild(btn));
       $("#manager-tools").style.display = "block";
@@ -192,15 +181,12 @@
     }
 
     if (outletParam) {
-      // OUTLET NFC FLOW
       const storedManager = getStoredManager();
       if (storedManager) {
         setTitle("⏳ Redirecting to Clock-In…");
         setDesc(`Manager: <b>${storedManager}</b> • Outlet: <b>${outletParam}</b>`);
-        // Hidden POST to JotForm (no URL params shown)
         redirectToJotFormPOST(storedManager, outletParam);
       } else {
-        // No manager cache yet → instruct to open Manager Link IN THIS BROWSER
         cleanUrlBar();
         setTitle("👋 One-time Setup Needed");
         setDesc(`You’re using <b>${currentBrowser}</b>. Please open your <b>Manager Link</b> in <b>${currentBrowser}</b> to save your manager name, then tap the outlet NFC tag again to clock in.`);
@@ -208,7 +194,6 @@
       return;
     }
 
-    // No recognizable params
     cleanUrlBar();
     setTitle("ℹ️ How to Use");
     setDesc(`1) Tap your <b>Manager Link</b> in your preferred browser (this saves your manager name in that browser).<br/>2) Then, at the outlet, tap the <b>Outlet NFC tag</b> in the <u>same browser</u> to clock in.`);
@@ -216,3 +201,4 @@
 </script>
 </body>
 </html>
+
