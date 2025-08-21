@@ -1,54 +1,106 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Super Dining Clock-In</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Super Dining • Clock-In Router</title>
   <style>
-    body { margin:0; font-family: Arial, sans-serif; }
-    #status { text-align:center; padding:20px; font-size:18px; color:#444; }
-    iframe { width:100%; height:100vh; border:none; display:none; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; line-height:1.4; padding:24px; text-align:center; }
+    .card { max-width:560px; margin:0 auto; border:1px solid #e5e7eb; border-radius:14px; padding:20px; box-shadow:0 1px 3px rgba(0,0,0,.06); }
+    h2 { margin:0 0 8px; font-size:20px; }
+    p { margin:8px 0; color:#374151; }
+    .hint { color:#6b7280; font-size:14px; }
+    .btn { display:inline-block; padding:10px 14px; border:0; border-radius:10px; cursor:pointer; font-size:15px; background:#111827; color:#fff; text-decoration:none; }
+    .btn.alt { background:#4b5563; }
+    .row { margin-top:14px; display:flex; justify-content:center; gap:8px; flex-wrap:wrap; }
   </style>
 </head>
 <body>
-  <h2 id="status">Loading...</h2>
-  <iframe id="jotformFrame"></iframe>
+  <div class="card">
+    <h2 id="title">Loading…</h2>
+    <p id="desc" class="hint"></p>
+    <div class="row" id="actions" style="display:none;">
+      <button class="btn alt" id="clear">Clear Saved Manager</button>
+    </div>
+  </div>
 
   <script>
-    const jotformURL = "https://form.jotform.com/251891698588077";
-    const urlParams = new URLSearchParams(window.location.search);
-    const outletFromLink = urlParams.get("outlet");
-    const managerFromCache = localStorage.getItem("managerName");
+    // ===== Config =====
+    const JOTFORM_BASE = "https://form.jotform.com/251891698588077";
+    const LS_MANAGER_KEY = "managerName";
 
-    const status = document.getElementById("status");
-    const iframe = document.getElementById("jotformFrame");
+    // ===== Helpers =====
+    const $ = sel => document.querySelector(sel);
+    const setTitle = t => $("#title").textContent = t;
+    const setDesc  = d => $("#desc").innerHTML   = d;
 
-    if (!managerFromCache) {
-      status.innerText = "⚠️ Manager not saved. Please click your manager link first.";
-    } else if (!outletFromLink) {
-      status.innerText = "⚠️ No outlet detected. Please tap NFC tag.";
-    } else {
-      // Hide status & show form
-      status.style.display = "none";
-      iframe.style.display = "block";
-      iframe.src = jotformURL;
+    const qp = new URLSearchParams(location.search);
+    const managerParam = qp.get("manager");
+    const outletParam  = qp.get("outlet");
 
-      // Listen for form ready event
-      window.addEventListener("message", function(e) {
-        if (e.data && e.data.type === "jfEvent" && e.data.eventName === "formReady") {
-          iframe.contentWindow.postMessage({
-            "type": "setFieldsValue",
-            "value": {
-              "name": managerFromCache,
-              "outlet": outletFromLink
-            }
-          }, "*");
-        }
-      });
+    const getManager = () => localStorage.getItem(LS_MANAGER_KEY);
+    const setManager = v => localStorage.setItem(LS_MANAGER_KEY, v);
+    const clearManager = () => localStorage.removeItem(LS_MANAGER_KEY);
+
+    function cleanUrl() {
+      try {
+        const clean = location.origin + location.pathname;
+        history.replaceState({}, document.title, clean);
+      } catch(e) {}
     }
+
+    function redirectToJotformGET(name, outlet) {
+      // Jotform prefill works via GET only
+      const params = new URLSearchParams({
+        name: name || "",
+        outlet: outlet || ""
+      });
+      // Use replace() so Back doesn’t return here
+      location.replace(JOTFORM_BASE + "?" + params.toString());
+    }
+
+    // ===== Flow =====
+    (function init(){
+      // If manager link tapped: save and clean URL
+      if (managerParam && managerParam.trim() !== "") {
+        setManager(managerParam.trim());
+        cleanUrl();
+        setTitle("✅ Manager Saved");
+        setDesc(`Saved as <b>${managerParam.trim()}</b>. Now tap the outlet NFC tag to clock in.`);
+        $("#actions").style.display = "flex";
+        return;
+      }
+
+      // If outlet NFC tapped
+      if (outletParam && outletParam.trim() !== "") {
+        const saved = getManager();
+        if (!saved) {
+          cleanUrl();
+          setTitle("👋 Manager Not Set");
+          setDesc(`Please click your <b>Manager Link</b> first to save your name in this browser, then tap the outlet NFC tag again.`);
+          $("#actions").style.display = "flex";
+          return;
+        }
+        // We have both → redirect with GET (reliable with Jotform)
+        setTitle("⏳ Redirecting to Clock-In…");
+        setDesc(`Manager: <b>${saved}</b> • Outlet: <b>${outletParam.trim()}</b>`);
+        redirectToJotformGET(saved, outletParam.trim());
+        return;
+      }
+
+      // No params
+      cleanUrl();
+      setTitle("ℹ️ How to Use");
+      setDesc(`1) Tap your <b>Manager Link</b> (saves your name here).<br/>2) Then tap the <b>Outlet NFC tag</b> to clock in.`);
+      $("#actions").style.display = "flex";
+    })();
+
+    // UI actions
+    $("#clear").addEventListener("click", () => {
+      clearManager();
+      setTitle("🧹 Cleared");
+      setDesc("Saved manager removed. Tap your Manager Link again to save it.");
+    });
   </script>
 </body>
 </html>
-
-
-
-
