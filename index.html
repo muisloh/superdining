@@ -11,6 +11,11 @@
 
   const savedManager = localStorage.getItem("managerName");
 
+  // 🧹 Always clean URL after reading params
+  if (managerName || outletName) {
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+
   // If outlet is tapped but no manager stored → show warning
   if (outletName && !savedManager) {
     document.getElementById("warning").style.display = "block";
@@ -34,10 +39,8 @@
         console.error("Injection error:", e);
       }
     };
-
-    // 🧹 Clean up URL so staff won’t see ?outlet=KURA
-    window.history.replaceState({}, document.title, window.location.pathname);
   }
 </script>
+
 
 
