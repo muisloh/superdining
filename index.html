@@ -28,32 +28,19 @@
 
     const savedManager = localStorage.getItem("managerName");
 
-    // If outlet is tapped but no manager stored → show warning
+    // If outlet tapped but no manager stored → show warning
     if (outletName && !savedManager) {
       document.getElementById("warning").style.display = "block";
     }
 
-    // If we have both manager + outlet → load Jotform
+    // If we have both manager + outlet → load Jotform with Prefill
     if (outletName && savedManager) {
+      const prefillUrl = `https://form.jotform.com/251891698588077?name=${encodeURIComponent(savedManager)}&outlet=${encodeURIComponent(outletName)}`;
       const iframe = document.getElementById("jotformFrame");
       iframe.style.display = "block";
-      iframe.src = "https://form.jotform.com/251891698588077";
-
-      iframe.onload = () => {
-        try {
-          const innerDoc = iframe.contentDocument || iframe.contentWindow.document;
-
-          // Fill the hidden fields using Field IDs
-          const nameField = innerDoc.querySelector("#input13");
-          const outletField = innerDoc.querySelector("#input14");
-
-          if (nameField) nameField.value = savedManager;
-          if (outletField) outletField.value = outletName;
-        } catch (e) {
-          console.error("Injection error:", e);
-        }
-      };
+      iframe.src = prefillUrl;
     }
   </script>
 </body>
 </html>
+
