@@ -11,12 +11,12 @@
 
   const savedManager = localStorage.getItem("managerName");
 
-  // 🧹 Delay cleaning URL to ensure values are captured
-  if (managerName || outletName) {
-    setTimeout(() => {
+  // Clean the URL AFTER the DOM is loaded
+  window.addEventListener("load", () => {
+    if (managerName || outletName) {
       window.history.replaceState({}, document.title, window.location.pathname);
-    }, 200);
-  }
+    }
+  });
 
   // If outlet is tapped but no manager stored → show warning
   if (outletName && !savedManager) {
@@ -43,3 +43,4 @@
     };
   }
 </script>
+
