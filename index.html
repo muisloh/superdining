@@ -2,57 +2,58 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>SuperDining NFC Clock-In</title>
-  <script>
-    document.addEventListener("DOMContentLoaded", function () {
-      const params = new URLSearchParams(window.location.search);
-      const manager = params.get("manager");
-      const outlet = params.get("outlet");
-
-      // 1. Save manager into localStorage
-      if (manager) {
-        localStorage.setItem("managerName", manager);
-        document.body.innerHTML = `<h2>✅ Manager saved: ${manager}. You can now tap an outlet NFC tag.</h2>`;
-        return;
-      }
-
-      // 2. If outlet NFC is tapped
-      if (outlet) {
-        const savedManager = localStorage.getItem("managerName");
-
-        if (!savedManager) {
-          document.body.innerHTML = `<h2>⚠️ Please save manager info first before tapping outlet tag.</h2>`;
-          return;
-        }
-
-        // 3. Auto-submit hidden form to JotForm (POST method)
-        const form = document.createElement("form");
-        form.method = "POST";
-        form.action = "https://form.jotform.com/251891698588077";
-
-        const nameField = document.createElement("input");
-        nameField.type = "hidden";
-        nameField.name = "name";
-        nameField.value = savedManager;
-
-        const outletField = document.createElement("input");
-        outletField.type = "hidden";
-        outletField.name = "outlet";
-        outletField.value = outlet;
-
-        form.appendChild(nameField);
-        form.appendChild(outletField);
-        document.body.appendChild(form);
-        form.submit();
-
-        return;
-      }
-
-      // 4. If no manager/outlet in URL
-      document.body.innerHTML = `<h2>Welcome. Please use your manager link first or tap an outlet NFC tag.</h2>`;
-    });
-  </script>
+  <title>SuperDining Clock In</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+    iframe { width: 100%; height: 90vh; border: none; }
+  </style>
 </head>
 <body>
+  <h2>Loading Clock In...</h2>
+  <div id="warning" style="display:none; color:red; font-weight:bold;">
+    Please open your Manager link first before tapping the outlet NFC tag.
+  </div>
+  <iframe id="jotformFrame" src="" style="display:none;"></iframe>
+
+  <script>
+    // Read params from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const managerName = urlParams.get("manager");
+    const outletName = urlParams.get("outlet");
+
+    // Save manager in localStorage if provided
+    if (managerName) {
+      localStorage.setItem("managerName", managerName);
+    }
+
+    const savedManager = localStorage.getItem("managerName");
+
+    // If outlet is tapped but no manager stored → show warning
+    if (outletName && !savedManager) {
+      document.getElementById("warning").style.display = "block";
+    }
+
+    // If we have both manager + outlet → load Jotform
+    if (outletName && savedManager) {
+      const iframe = document.getElementById("jotformFrame");
+      iframe.style.display = "block";
+      iframe.src = "https://form.jotform.com/251891698588077";
+
+      iframe.onload = () => {
+        try {
+          const innerDoc = iframe.contentDocument || iframe.contentWindow.document;
+
+          // Fill the hidden fields using Field IDs
+          const nameField = innerDoc.querySelector("#input13");
+          const outletField = innerDoc.querySelector("#input14");
+
+          if (nameField) nameField.value = savedManager;
+          if (outletField) outletField.value = outletName;
+        } catch (e) {
+          console.error("Injection error:", e);
+        }
+      };
+    }
+  </script>
 </body>
 </html>
