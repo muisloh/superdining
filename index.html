@@ -1,46 +1,43 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>SuperDining Clock In</title>
-  <style>
-    body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
-    iframe { width: 100%; height: 90vh; border: none; }
-  </style>
-</head>
-<body>
-  <h2>Loading Clock In...</h2>
-  <div id="warning" style="display:none; color:red; font-weight:bold;">
-    Please open your Manager link first before tapping the outlet NFC tag.
-  </div>
-  <iframe id="jotformFrame" src="" style="display:none;"></iframe>
+<script>
+  // Read params from URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const managerName = urlParams.get("manager");
+  const outletName = urlParams.get("outlet");
 
-  <script>
-    // Read params from URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const managerName = urlParams.get("manager");
-    const outletName = urlParams.get("outlet");
+  // Save manager in localStorage if provided
+  if (managerName) {
+    localStorage.setItem("managerName", managerName);
+  }
 
-    // Save manager in localStorage if provided
-    if (managerName) {
-      localStorage.setItem("managerName", managerName);
-    }
+  const savedManager = localStorage.getItem("managerName");
 
-    const savedManager = localStorage.getItem("managerName");
+  // If outlet is tapped but no manager stored → show warning
+  if (outletName && !savedManager) {
+    document.getElementById("warning").style.display = "block";
+  }
 
-    // If outlet tapped but no manager stored → show warning
-    if (outletName && !savedManager) {
-      document.getElementById("warning").style.display = "block";
-    }
+  // If we have both manager + outlet → load Jotform
+  if (outletName && savedManager) {
+    const iframe = document.getElementById("jotformFrame");
+    iframe.style.display = "block";
+    iframe.src = "https://form.jotform.com/251891698588077";
 
-    // If we have both manager + outlet → load Jotform with Prefill
-    if (outletName && savedManager) {
-      const prefillUrl = `https://form.jotform.com/251891698588077?name=${encodeURIComponent(savedManager)}&outlet=${encodeURIComponent(outletName)}`;
-      const iframe = document.getElementById("jotformFrame");
-      iframe.style.display = "block";
-      iframe.src = prefillUrl;
-    }
-  </script>
-</body>
-</html>
+    iframe.onload = () => {
+      try {
+        const innerDoc = iframe.contentDocument || iframe.contentWindow.document;
+        const nameField = innerDoc.querySelector("#input13");
+        const outletField = innerDoc.querySelector("#input14");
+
+        if (nameField) nameField.value = savedManager;
+        if (outletField) outletField.value = outletName;
+      } catch (e) {
+        console.error("Injection error:", e);
+      }
+    };
+
+    // 🧹 Clean up URL so staff won’t see ?outlet=KURA
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+</script>
+
 
