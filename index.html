@@ -1,46 +1,53 @@
 <script>
-  // Read params from URL
+  const showDebug = false;
+
+  function logDebug(message) {
+    console.log(message);
+    if (showDebug) {
+      const dbg = document.getElementById("debug");
+      if (dbg) {
+        dbg.style.display = "block";
+        dbg.innerHTML += message + "<br>";
+        dbg.scrollTop = dbg.scrollHeight;
+      }
+    }
+  }
+
+  // Read URL params
   const urlParams = new URLSearchParams(window.location.search);
   const managerName = urlParams.get("manager");
   const outletName = urlParams.get("outlet");
 
-  // Save manager in localStorage if provided
+  // Save manager into localStorage if provided
   if (managerName) {
     localStorage.setItem("managerName", managerName);
   }
 
   const savedManager = localStorage.getItem("managerName");
 
-  // Clean the URL AFTER the DOM is loaded
-  window.addEventListener("load", () => {
-    if (managerName || outletName) {
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-  });
+  // ⚡ Instantly clean URL so params don't stay visible
+  if (managerName || outletName) {
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
 
-  // If outlet is tapped but no manager stored → show warning
+  // Case A: Outlet tapped but no manager saved
   if (outletName && !savedManager) {
     document.getElementById("warning").style.display = "block";
   }
 
-  // If we have both manager + outlet → load Jotform
+  // Case B: Both manager + outlet available → load Jotform with prefilled params
   if (outletName && savedManager) {
     const iframe = document.getElementById("jotformFrame");
     iframe.style.display = "block";
-    iframe.src = "https://form.jotform.com/251891698588077";
 
-    iframe.onload = () => {
-      try {
-        const innerDoc = iframe.contentDocument || iframe.contentWindow.document;
-        const nameField = innerDoc.querySelector("#input13");
-        const outletField = innerDoc.querySelector("#input14");
+    // ✅ Use Jotform prefill instead of injection
+    const jotformURL =
+      "https://form.jotform.com/251891698588077" +
+      "?name=" + encodeURIComponent(savedManager) +
+      "&outlet=" + encodeURIComponent(outletName);
 
-        if (nameField) nameField.value = savedManager;
-        if (outletField) outletField.value = outletName;
-      } catch (e) {
-        console.error("Injection error:", e);
-      }
-    };
+    iframe.src = jotformURL;
   }
 </script>
+
 
