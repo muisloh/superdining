@@ -1,108 +1,73 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SuperDining Clock In</title>
+  <meta charset="UTF-8">
+  <title>SuperDining Clock-In</title>
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background:#f7f7f7; }
-    h2 { margin: 0 0 10px; }
-    #message { font-weight: 600; margin: 10px 0 16px; }
-    .success { color: #0a7a27; }
-    .warning { color: #c00; }
-    iframe { width: 100%; height: 90vh; border: 0; display: none; background:#fff; }
-    #fallback { display:none; margin-top:12px; }
-    #fallback a { display:inline-block; padding:10px 14px; border-radius:10px; border:1px solid #e5e7eb; text-decoration:none; color:#111; background:#fff; }
-    #debug { display:none; font-family:monospace; font-size:12px; color:#0b0; background:#111; padding:8px; margin-top:8px; max-height:160px; overflow:auto; text-align:left; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      text-align: center;
+      padding: 40px;
+    }
+    #message {
+      margin: 20px 0;
+      font-size: 1.2em;
+      color: #333;
+    }
+    iframe {
+      width: 100%;
+      height: 700px;
+      border: none;
+      margin-top: 20px;
+    }
   </style>
 </head>
 <body>
-  <h2>SuperDining Clock In</h2>
-  <div id="message">Loading…</div>
-
-  <!-- Jotform embed -->
-  <iframe id="jotformFrame"></iframe>
-
-  <!-- Fallback button (only shows if iframe has trouble) -->
-  <div id="fallback"><a id="openInNewTab" target="_blank" rel="noopener">Open form in a new tab</a></div>
-
-  <!-- Hidden debug panel; set showDebug=true in JS to show -->
-  <div id="debug"></div>
+  <h1>SuperDining Manager Clock-In</h1>
+  <div id="message">Please scan your Manager QR code to begin.</div>
+  
+  <!-- iframe for JotForm -->
+  <iframe 
+    id="jotformFrame" 
+    src="" 
+    style="display:none;"
+    allow="geolocation; clipboard-read; clipboard-write; camera; microphone">
+  </iframe>
 
   <script>
-    /**** config ****/
-    const JOTFORM_BASE = "https://form.jotform.com/251891698588077";
-    const LS_MANAGER_KEY = "managerName";
-    const showDebug = false; // set true to show on-page logs
+    // JotForm base URL
+    const jotformBase = "https://form.jotform.com/251891698588077";
+    const urlParams = new URLSearchParams(window.location.search);
 
-    /**** tiny helpers ****/
-    const msgBox = document.getElementById("message");
-    const iframe = document.getElementById("jotformFrame");
-    const fallbackWrap = document.getElementById("fallback");
-    const fallbackLink = document.getElementById("openInNewTab");
-    const dbgEl = document.getElementById("debug");
-    function d(msg){ console.log(msg); if(showDebug){ dbgEl.style.display="block"; dbgEl.innerHTML += msg+"<br>"; dbgEl.scrollTop = dbgEl.scrollHeight; } }
+    // Check if manager name is already saved
+    let savedName = localStorage.getItem("managerName");
 
-    // Parse query once, BEFORE we wipe it
-    const q = new URLSearchParams(window.location.search);
-    const managerParam = q.get("manager"); // from manager QR
-    const outletParam  = q.get("outlet");  // from outlet NFC
+    if (urlParams.has("manager")) {
+      // Save manager name from QR
+      savedName = urlParams.get("manager");
+      localStorage.setItem("managerName", savedName);
+      document.getElementById("message").innerText = 
+        `Manager name saved: ${savedName}. Please use this browser for future clock-in by tapping your outlet NFC tag.`;
+    } 
 
-    d("Params: manager=" + managerParam + " | outlet=" + outletParam);
-
-    // Save/refresh manager cache if provided
-    if (managerParam) {
-      localStorage.setItem(LS_MANAGER_KEY, managerParam);
-      d("Saved manager to localStorage: " + managerParam);
-      msgBox.className = "success";
-      msgBox.innerHTML = "✅ Manager name saved successfully.<br>Please continue to use this browser for future clock-ins by tapping your outlet’s NFC tag.";
-    }
-
-    // Always read the latest saved manager
-    const savedManager = localStorage.getItem(LS_MANAGER_KEY);
-    d("Stored manager = " + savedManager);
-
-    // Clean the address bar right after reading params (no visible ?outlet=… or ?manager=…)
-    if (window.location.search) {
-      history.replaceState({}, document.title, window.location.pathname);
-      d("Cleaned URL via history.replaceState");
-    }
-
-    // If outlet tapped but no manager saved → show warning and stop
-    if (outletParam && !savedManager) {
-      msgBox.className = "warning";
-      msgBox.innerHTML = "⚠️ Manager name not found.<br>Please save your name first before using the outlet NFC tag for clock-in.";
-    }
-
-    // If both manager + outlet available → load Jotform with prefill (inside iframe)
-    if (outletParam && savedManager) {
-      const jotURL = JOTFORM_BASE
-        + "?name="   + encodeURIComponent(savedManager)
-        + "&outlet=" + encodeURIComponent(outletParam);
-
-      d("Embedding Jotform with URL: " + jotURL);
-
-      // Show form
-      iframe.style.display = "block";
-      msgBox.textContent = ""; // hide loading/message once form shows
-      iframe.src = jotURL;
-
-      // Fallback: if iframe doesn’t load quickly, show “open in new tab”
-      let fallbackTimer = setTimeout(() => {
-        fallbackLink.href = jotURL;
-        fallbackWrap.style.display = "block";
-        d("Showing fallback button.");
-      }, 2000);
-
-      iframe.addEventListener("load", () => {
-        clearTimeout(fallbackTimer);
-        d("Iframe loaded.");
-      });
-    }
-
-    // If no params at all, show a friendly default hint
-    if (!managerParam && !outletParam) {
-      msgBox.textContent = "Tip: Scan your Manager QR to save your name, then tap the outlet NFC tag to clock in.";
+    if (urlParams.has("outlet")) {
+      if (!savedName) {
+        // No manager saved yet
+        document.getElementById("message").innerText = 
+          "Please save your name first before using the outlet NFC tag for clock-in.";
+      } else {
+        // Manager saved, proceed with outlet
+        const outlet = urlParams.get("outlet");
+        document.getElementById("message").innerText = 
+          `Clock-in form loading for outlet: ${outlet}`;
+        
+        // Build prefill link
+        const jotformURL = `${jotformBase}?name=${encodeURIComponent(savedName)}&outlet=${encodeURIComponent(outlet)}`;
+        const iframe = document.getElementById("jotformFrame");
+        iframe.src = jotformURL;
+        iframe.style.display = "block";
+      }
     }
   </script>
 </body>
