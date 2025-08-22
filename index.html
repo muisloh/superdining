@@ -1,70 +1,112 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SuperDining Clock In</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Manager Clock-In Redirect</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: sans-serif;
       text-align: center;
-      padding: 20px;
-      background: #f5f5f5;
+      padding: 2rem;
     }
-    #message {
-      font-size: 1.2em;
-      margin-bottom: 20px;
-      color: #333;
-    }
-    iframe {
-      width: 100%;
-      height: 800px;
-      border: none;
+    .hidden {
       display: none;
     }
-    .hidden { display: none; }
   </style>
 </head>
 <body>
-  <h2>SuperDining Clock In</h2>
-  <div id="message">Loading...</div>
-  <iframe id="jotformFrame"></iframe>
+  <h2 id="status">🔄 Loading...</h2>
+  <p id="message"></p>
 
   <script>
-    function getQueryParam(param) {
-      const urlParams = new URLSearchParams(window.location.search);
-      return urlParams.get(param);
+    const query = new URLSearchParams(window.location.search);
+    const manager = query.get("manager");
+    const outlet = query.get("outlet");
+
+    const jotformBase = "https://form.jotform.com/251891698588077";
+
+    const statusEl = document.getElementById("status");
+    const messageEl = document.getElementById("message");
+
+    function storeManager(name) {
+      localStorage.setItem("superdining_manager", name);
     }
 
-    const managerName = getQueryParam("manager");
-    const outletName = getQueryParam("outlet");
+    function getStoredManager() {
+      return localStorage.getItem("superdining_manager");
+    }
 
-    const savedManager = localStorage.getItem("managerName");
+    function redirectToForm(name, outlet) {
+      const jotformUrl = `${jotformBase}?name=${encodeURIComponent(name)}&outlet=${encodeURIComponent(outlet)}`;
+      window.location.href = jotformUrl;
+    }
 
-    const messageDiv = document.getElementById("message");
-    const iframe = document.getElementById("jotformFrame");
+    function showStatus(title, message) {
+      statusEl.textContent = title;
+      messageEl.textContent = message || "";
+    }
 
-    if (managerName) {
-      // Save manager name
-      localStorage.setItem("managerName", managerName);
-      messageDiv.textContent = 
-        `Manager name saved: ${managerName}. Please use this browser for future clock-in by tapping outlet NFC.`;
-      history.replaceState({}, document.title, window.location.pathname); // Clean URL
-    } else if (outletName) {
-      if (savedManager) {
-        // Show JotForm with name + outlet prefilled
-        iframe.style.display = "block";
-        iframe.src = "https://form.jotform.com/251891698588077"
-                   + "?name=" + encodeURIComponent(savedManager)
-                   + "&outlet=" + encodeURIComponent(outletName);
-        messageDiv.textContent = "";
-      } else {
-        messageDiv.textContent = "Please save your name first before using the outlet NFC tag for clock-in.";
-        history.replaceState({}, document.title, window.location.pathname); // Clean URL
+    function getBrowserName() {
+      const ua = navigator.userAgent.toLowerCase();
+      if (ua.includes("android")) {
+        if (!ua.includes("chrome")) return "not-chrome";
       }
-    } else {
-      messageDiv.textContent = "Please scan your Manager QR first to save your name before using the outlet NFC tag for clock-in.";
+      if (ua.includes("iphone") || ua.includes("ipad")) {
+        if (!ua.includes("safari") || ua.includes("crios") || ua.includes("fxios")) return "not-safari";
+      }
+      return "ok";
     }
+
+    function ensureCorrectBrowser() {
+      const browserCheck = getBrowserName();
+      if (browserCheck === "not-chrome") {
+        showStatus("🔒 Open in Chrome", "Please open this link using Google Chrome.");
+        return false;
+      }
+      if (browserCheck === "not-safari") {
+        showStatus("🔒 Open in Safari", "Please open this link using Safari browser.");
+        return false;
+      }
+      return true;
+    }
+
+    (function init() {
+      if (!ensureCorrectBrowser()) return;
+
+      if (manager) {
+        storeManager(manager);
+        showStatus("✅ Manager Verified", `Hi ${manager}, now tap the outlet NFC tag to proceed.`);
+      } else if (outlet) {
+        const storedManager = getStoredManager();
+        if (storedManager) {
+          showStatus("✅ Redirecting...", `Manager: ${storedManager}, Outlet: ${outlet}`);
+          redirectToForm(storedManager, outlet);
+        } else {
+          showStatus("❌ Access Denied", "Please tap your manager NFC tag first.");
+        }
+      } else {
+        showStatus("ℹ️ Invalid Access", "Please use the NFC tags to access this form.");
+      }
+
+      window.history.pushState({}, document.title, '/superdining/');
+    })();
+
+    // 🔒 Basic copy prevention
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('selectstart', e => e.preventDefault());
+    document.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'u')) {
+        e.preventDefault();
+      }
+    });
+    let longPressTimer;
+    document.addEventListener('touchstart', () => {
+      longPressTimer = setTimeout(() => {
+        alert("Action blocked.");
+      }, 600);
+    });
+    document.addEventListener('touchend', () => clearTimeout(longPressTimer));
   </script>
 </body>
 </html>
