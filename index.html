@@ -2,66 +2,68 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SuperDining Clock In</title>
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
-    iframe { width: 100%; height: 90vh; border: none; }
-    #message { font-weight: bold; margin: 20px 0; }
-    .success { color: green; }
-    .warning { color: red; }
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    #message {
+      font-size: 1.2em;
+      margin-bottom: 20px;
+      color: #333;
+    }
+    iframe {
+      width: 100%;
+      height: 800px;
+      border: none;
+      display: none;
+    }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
-  <h2>Loading Clock In...</h2>
-  <div id="message"></div>
-  <iframe id="jotformFrame" src="" style="display:none;"></iframe>
+  <h2>SuperDining Clock In</h2>
+  <div id="message">Loading...</div>
+  <iframe id="jotformFrame"></iframe>
 
   <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const managerName = urlParams.get("manager");
-    const outletName = urlParams.get("outlet");
-    const msgBox = document.getElementById("message");
-
-    // Remove query params from address bar after reading
-    if (window.location.search) {
-      history.replaceState({}, document.title, window.location.pathname);
+    function getQueryParam(param) {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get(param);
     }
 
-    // Save manager in localStorage if provided
-    if (managerName) {
-      localStorage.setItem("managerName", managerName);
-      msgBox.innerHTML = "✅ Manager name saved successfully.<br>Please continue to use this browser for future clock-ins by tapping your outlet’s NFC tag.";
-      msgBox.className = "success";
-    }
+    const managerName = getQueryParam("manager");
+    const outletName = getQueryParam("outlet");
 
     const savedManager = localStorage.getItem("managerName");
 
-    // If outlet is tapped but no manager stored → show warning
-    if (outletName && !savedManager) {
-      msgBox.innerHTML = "⚠️ Manager name not found.<br>Please save your name first before using the outlet NFC tag for clock-in.";
-      msgBox.className = "warning";
-    }
+    const messageDiv = document.getElementById("message");
+    const iframe = document.getElementById("jotformFrame");
 
-    // If we have both manager + outlet → load Jotform
-    if (outletName && savedManager) {
-      const iframe = document.getElementById("jotformFrame");
-      iframe.style.display = "block";
-      iframe.src = "https://form.jotform.com/251891698588077";
-
-      iframe.onload = () => {
-        try {
-          const innerDoc = iframe.contentDocument || iframe.contentWindow.document;
-
-          // Fill the hidden fields using Field IDs
-          const nameField = innerDoc.querySelector("#input13");
-          const outletField = innerDoc.querySelector("#input14");
-
-          if (nameField) nameField.value = savedManager;
-          if (outletField) outletField.value = outletName;
-        } catch (e) {
-          console.error("Injection error:", e);
-        }
-      };
+    if (managerName) {
+      // Save manager name
+      localStorage.setItem("managerName", managerName);
+      messageDiv.textContent = 
+        `Manager name saved: ${managerName}. Please use this browser for future clock-in by tapping outlet NFC.`;
+      history.replaceState({}, document.title, window.location.pathname); // Clean URL
+    } else if (outletName) {
+      if (savedManager) {
+        // Show JotForm with name + outlet prefilled
+        iframe.style.display = "block";
+        iframe.src = "https://form.jotform.com/251891698588077"
+                   + "?name=" + encodeURIComponent(savedManager)
+                   + "&outlet=" + encodeURIComponent(outletName);
+        messageDiv.textContent = "";
+      } else {
+        messageDiv.textContent = "Please save your name first before using the outlet NFC tag for clock-in.";
+        history.replaceState({}, document.title, window.location.pathname); // Clean URL
+      }
+    } else {
+      messageDiv.textContent = "Please scan your Manager QR first to save your name before using the outlet NFC tag for clock-in.";
     }
   </script>
 </body>
