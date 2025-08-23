@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Redirecting...</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 40px; }
+    #choice { display: none; }
+    button { margin: 10px; padding: 15px 25px; font-size: 18px; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <h2 id="status">Redirecting...</h2>
+
+  <div id="choice">
+    <p>If you are not redirected, please choose manually:</p>
+    <button onclick="openInChrome()">Open in Chrome</button>
+    <button onclick="openInFirefox()">Open in Firefox</button>
+    <button onclick="openInSafari()">Open in Safari</button>
+  </div>
+
+  <script>
+    // Get ?target= from query string
+    const params = new URLSearchParams(window.location.search);
+    const targetUrl = params.get("target") || "https://muisloh.github.io/superdining/";
+
+    function openInChrome() {
+      window.location.href = "googlechrome://" + targetUrl.replace(/^https?:\/\//, "");
+    }
+    function openInFirefox() {
+      window.location.href = "firefox://" + targetUrl;
+    }
+    function openInSafari() {
+      window.location.href = targetUrl;
+    }
+
+    // Detect browser from userAgent
+    const ua = navigator.userAgent.toLowerCase();
+    let redirected = false;
+
+    if (ua.includes("chrome") && !ua.includes("edg") && !ua.includes("opr")) {
+      openInChrome();
+      redirected = true;
+    } else if (ua.includes("firefox")) {
+      openInFirefox();
+      redirected = true;
+    } else if (ua.includes("safari") && !ua.includes("chrome")) {
+      openInSafari();
+      redirected = true;
+    } else {
+      // Unknown → just open normally
+      window.location.href = targetUrl;
+      redirected = true;
+    }
+
+    // If redirect didn’t work (app not installed), show manual choice after 2s
+    setTimeout(() => {
+      if (!redirected) {
+        document.getElementById("status").textContent = "Please choose your browser:";
+        document.getElementById("choice").style.display = "block";
+      }
+    }, 2000);
+  </script>
+</body>
+</html>
