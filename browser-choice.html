@@ -34,32 +34,36 @@
       window.location.href = targetUrl;
     }
 
-    // Detect browser from userAgent
+    // Detect browser
     const ua = navigator.userAgent.toLowerCase();
-    let redirected = false;
+
+    function tryRedirect(schemeUrl, fallbackUrl) {
+      // Try opening scheme
+      window.location.href = schemeUrl;
+
+      // Fallback after 1s if it didn’t open
+      setTimeout(() => {
+        window.location.href = fallbackUrl;
+      }, 1000);
+    }
 
     if (ua.includes("chrome") && !ua.includes("edg") && !ua.includes("opr")) {
-      openInChrome();
-      redirected = true;
+      tryRedirect("googlechrome://" + targetUrl.replace(/^https?:\/\//, ""), targetUrl);
     } else if (ua.includes("firefox")) {
-      openInFirefox();
-      redirected = true;
+      tryRedirect("firefox://" + targetUrl, targetUrl);
     } else if (ua.includes("safari") && !ua.includes("chrome")) {
       openInSafari();
-      redirected = true;
     } else {
       // Unknown → just open normally
       window.location.href = targetUrl;
-      redirected = true;
     }
 
-    // If redirect didn’t work (app not installed), show manual choice after 2s
+    // Safety: show manual buttons if still stuck after 3s
     setTimeout(() => {
-      if (!redirected) {
-        document.getElementById("status").textContent = "Please choose your browser:";
-        document.getElementById("choice").style.display = "block";
-      }
-    }, 2000);
+      document.getElementById("status").textContent = "Please choose your browser:";
+      document.getElementById("choice").style.display = "block";
+    }, 3000);
   </script>
 </body>
 </html>
+
