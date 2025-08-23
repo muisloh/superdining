@@ -10,13 +10,12 @@
   </style>
 </head>
 <body>
-  <h2 id="status">Redirecting...</h2>
+  <h2 id="status">Redirecting to Chrome...</h2>
 
   <div id="choice">
     <p>If you are not redirected, please choose manually:</p>
     <button onclick="openInChrome()">Open in Chrome</button>
-    <button onclick="openInFirefox()">Open in Firefox</button>
-    <button onclick="openInSafari()">Open in Safari</button>
+    <button onclick="openNormal()">Open Normally</button>
   </div>
 
   <script>
@@ -27,43 +26,23 @@
     function openInChrome() {
       window.location.href = "googlechrome://" + targetUrl.replace(/^https?:\/\//, "");
     }
-    function openInFirefox() {
-      window.location.href = "firefox://" + targetUrl;
-    }
-    function openInSafari() {
+    function openNormal() {
       window.location.href = targetUrl;
     }
 
-    // Detect browser
-    const ua = navigator.userAgent.toLowerCase();
+    // Always try Chrome first
+    window.location.href = "googlechrome://" + targetUrl.replace(/^https?:\/\//, "");
 
-    function tryRedirect(schemeUrl, fallbackUrl) {
-      // Try opening scheme
-      window.location.href = schemeUrl;
-
-      // Fallback after 1s if it didn’t open
-      setTimeout(() => {
-        window.location.href = fallbackUrl;
-      }, 1000);
-    }
-
-    if (ua.includes("chrome") && !ua.includes("edg") && !ua.includes("opr")) {
-      tryRedirect("googlechrome://" + targetUrl.replace(/^https?:\/\//, ""), targetUrl);
-    } else if (ua.includes("firefox")) {
-      tryRedirect("firefox://" + targetUrl, targetUrl);
-    } else if (ua.includes("safari") && !ua.includes("chrome")) {
-      openInSafari();
-    } else {
-      // Unknown → just open normally
-      window.location.href = targetUrl;
-    }
-
-    // Safety: show manual buttons if still stuck after 3s
+    // If Chrome not available, fallback after 1s
     setTimeout(() => {
-      document.getElementById("status").textContent = "Please choose your browser:";
+      window.location.href = targetUrl;
+    }, 1000);
+
+    // Safety net: show manual choice if still stuck after 3s
+    setTimeout(() => {
+      document.getElementById("status").textContent = "Please choose manually:";
       document.getElementById("choice").style.display = "block";
     }, 3000);
   </script>
 </body>
 </html>
-
